@@ -88,6 +88,14 @@ class Scenario(BaseScenario):
         world.landmarks[0].state.p_pos = np.random.uniform(-1, +1, world.dim_p)
         world.landmarks[0].state.p_vel = np.zeros(world.dim_p)
 
+    # return all agents of the blue team
+    def blue_agents(self, world):
+        return [agent for agent in world.agents if not agent.adversary]
+
+    # return all agents of the red team
+    def red_agents(self, world):
+        return [agent for agent in world.agents if agent.adversary]
+
     def reward(self, agent, world):
         # Agents are rewarded based on team they belong to
         return self.adversary_reward(agent, world) if agent.adversary else self.agent_reward(agent, world)
