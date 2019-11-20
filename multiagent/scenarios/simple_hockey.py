@@ -31,7 +31,7 @@ class Scenario(BaseScenario):
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
             if i > 0:
-                landmark.collide = False
+                landmark.collide = True
                 landmark.movable = False
                 landmark.state.p_pos = np.array(goal_posts[i-1])
                 landmark.state.p_vel = np.zeros(world.dim_p)
