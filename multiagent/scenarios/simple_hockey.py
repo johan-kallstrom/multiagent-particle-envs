@@ -31,7 +31,7 @@ class Scenario(BaseScenario):
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
             if i > 0:
-                landmark.collide = True
+                landmark.collide = False
                 landmark.movable = False
                 landmark.state.p_pos = np.array(goal_posts[i-1])
                 landmark.state.p_vel = np.zeros(world.dim_p)
@@ -39,7 +39,7 @@ class Scenario(BaseScenario):
                 landmark.collide = True
                 landmark.movable = True
         # add landmarks for rink boundary
-        world.landmarks += self.set_boundaries(world)
+        #world.landmarks += self.set_boundaries(world)
         # make initial conditions
         self.reset_world(world)
         return world
