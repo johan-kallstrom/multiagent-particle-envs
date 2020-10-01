@@ -195,6 +195,8 @@ class MultiAgentEnv(gym.Env):
     def _reset_render(self):
         self.render_geoms = None
         self.render_geoms_xform = None
+        self.sensor_render_geoms = None
+        self.sensor_render_geoms_xform = None
 
     # render environment
     def render(self, mode='human'):
@@ -227,22 +229,35 @@ class MultiAgentEnv(gym.Env):
             from multiagent import rendering
             self.render_geoms = []
             self.render_geoms_xform = []
+            self.sensor_render_geoms = []
+            self.sensor_render_geoms_xform = []
             for entity in self.world.entities:
                 geom = rendering.make_circle(entity.size)
                 xform = rendering.Transform()
+                sensor_geom = rendering.make_circle(entity.size)
+                sensor_end_point = entity.state.p_pos + entity.state.p_vel
+                sensor_geom = rendering.make_polyline([entity.state.p_pos, sensor_end_point])
+                sensor_xform = rendering.Transform()
                 if 'agent' in entity.name:
                     geom.set_color(*entity.color, alpha=0.5)
+                    sensor_geom.set_color(*entity.color, alpha=0.5)
                 else:
                     geom.set_color(*entity.color)
+                    sensor_geom.set_color(*entity.color)
                 geom.add_attr(xform)
                 self.render_geoms.append(geom)
                 self.render_geoms_xform.append(xform)
+                self.sensor_render_geoms.append(sensor_geom)
+                self.sensor_render_geoms_xform.append(sensor_xform)
 
             # add geoms to viewer
             for viewer in self.viewers:
                 viewer.geoms = []
+                viewer.sensor_geoms = []
                 for geom in self.render_geoms:
                     viewer.add_geom(geom)
+                for sensor_geom in self.sensor_render_geoms:
+                    viewer.add_geom(sensor_geom)
 
         results = []
         for i in range(len(self.viewers)):
@@ -257,6 +272,8 @@ class MultiAgentEnv(gym.Env):
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
+                sensor_end_point = entity.state.p_pos + entity.state.p_vel
+                self.sensor_render_geoms_xform[e].set_translation(*sensor_end_point)
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
