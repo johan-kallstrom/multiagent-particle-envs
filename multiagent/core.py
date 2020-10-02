@@ -23,6 +23,18 @@ class Action(object):
         # communication action
         self.c = None
 
+class Sensor(object):
+    def __init__(self, sensor_fovs, sensor_ranges, default_mode=0, sensor_heading=None):
+        self.sensor_fovs = sensor_fovs
+        self.sensor_ranges = sensor_ranges
+        self.fov = sensor_fovs[default_mode]
+        self.range = sensor_ranges[default_mode]
+        self.heading = sensor_heading
+
+    def set_mode(self, mode):
+        self.fov = self.sensor_fovs[mode]
+        self.range = self.sensor_ranges[mode]
+
 # properties and state of physical world entity
 class Entity(object):
     def __init__(self):
@@ -38,13 +50,16 @@ class Entity(object):
         self.density = 25.0
         # color
         self.color = None
-        # max speed and accel
+        # max/min speed and accel
         self.max_speed = None
+        self.min_speed = None
         self.accel = None
         # state
         self.state = EntityState()
         # mass
         self.initial_mass = 1.0
+        # sensor
+        self.sensor = None
 
     @property
     def mass(self):

@@ -234,30 +234,27 @@ class MultiAgentEnv(gym.Env):
             for entity in self.world.entities:
                 geom = rendering.make_circle(entity.size)
                 xform = rendering.Transform()
-                sensor_geom = rendering.make_circle(entity.size)
-                sensor_end_point = entity.state.p_pos + entity.state.p_vel
-                sensor_geom = rendering.make_polyline([entity.state.p_pos, sensor_end_point])
-                sensor_xform = rendering.Transform()
-                if 'agent' in entity.name:
-                    geom.set_color(*entity.color, alpha=0.5)
-                    sensor_geom.set_color(*entity.color, alpha=0.5)
-                else:
-                    geom.set_color(*entity.color)
-                    sensor_geom.set_color(*entity.color)
+                geom.set_color(*entity.color)
                 geom.add_attr(xform)
                 self.render_geoms.append(geom)
                 self.render_geoms_xform.append(xform)
-                self.sensor_render_geoms.append(sensor_geom)
-                self.sensor_render_geoms_xform.append(sensor_xform)
+                if entity.sensor is not None:
+                    v = self._make_receptor_locations(entity)
+                    sensor_geom = rendering.make_polygon(v=v, filled=True)
+                    sensor_geom.set_color(*entity.color, alpha=0.2)
+                    sensor_xform = rendering.Transform()
+                    sensor_geom.add_attr(sensor_xform)
+                    self.sensor_render_geoms.append(sensor_geom)
+                    self.sensor_render_geoms_xform.append(sensor_xform)
 
             # add geoms to viewer
             for viewer in self.viewers:
                 viewer.geoms = []
                 viewer.sensor_geoms = []
-                for geom in self.render_geoms:
-                    viewer.add_geom(geom)
                 for sensor_geom in self.sensor_render_geoms:
                     viewer.add_geom(sensor_geom)
+                for geom in self.render_geoms:
+                    viewer.add_geom(geom)
 
         results = []
         for i in range(len(self.viewers)):
@@ -272,8 +269,8 @@ class MultiAgentEnv(gym.Env):
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
-                sensor_end_point = entity.state.p_pos + entity.state.p_vel
-                self.sensor_render_geoms_xform[e].set_translation(*sensor_end_point)
+                if entity.sensor is not None:
+                    self.sensor_render_geoms_xform[e].set_translation(*entity.state.p_pos)
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
@@ -281,15 +278,16 @@ class MultiAgentEnv(gym.Env):
 
     # create receptor field locations in local coordinate frame
     def _make_receptor_locations(self, agent):
+        if agent.sensor is None:
+            return []
         receptor_type = 'polar'
-        range_min = 0.05 * 2.0
-        range_max = 1.00
+        # range_min = 0.05 * 2.0
+        range_max = agent.sensor.range
         dx = []
         # circular receptive field
         if receptor_type == 'polar':
-            for angle in np.linspace(-np.pi, +np.pi, 8, endpoint=False):
-                for distance in np.linspace(range_min, range_max, 3):
-                    dx.append(distance * np.array([np.cos(angle), np.sin(angle)]))
+            for angle in np.linspace(-agent.sensor.fov/2, +agent.sensor.fov/2, 30, endpoint=True):
+                dx.append(range_max * np.array([np.cos(angle), np.sin(angle)]))
             # add origin
             dx.append(np.array([0.0, 0.0]))
         # grid receptive field
