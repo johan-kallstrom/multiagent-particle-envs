@@ -7,6 +7,8 @@ class EntityState(object):
         self.p_pos = None
         # physical velocity
         self.p_vel = None
+        # physical heading
+        self.p_head = None
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
@@ -23,6 +25,7 @@ class Action(object):
         # communication action
         self.c = None
 
+# sensor object for agents wit limited vision
 class Sensor(object):
     def __init__(self, sensor_fovs, sensor_ranges, default_mode=0, sensor_heading=None):
         self.sensor_fovs = sensor_fovs
@@ -60,6 +63,9 @@ class Entity(object):
         self.initial_mass = 1.0
         # sensor
         self.sensor = None
+    
+    def set_heading(self, p_vel):
+        pass
 
     @property
     def mass(self):
@@ -182,6 +188,7 @@ class World(object):
                     entity.state.p_vel = entity.state.p_vel / np.sqrt(np.square(entity.state.p_vel[0]) +
                                                                   np.square(entity.state.p_vel[1])) * entity.max_speed
             entity.state.p_pos += entity.state.p_vel * self.dt
+            entity.set_heading(entity.state.p_vel)
 
     def update_agent_state(self, agent):
         # set communication state (directly for now)
