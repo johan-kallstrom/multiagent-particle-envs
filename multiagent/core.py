@@ -2,7 +2,8 @@ import numpy as np
 
 # physical/external base state of all entites
 class EntityState(object):
-    def __init__(self):
+    def __init__(self, is_dynamic=True):
+        self.is_dynamic = is_dynamic
         # physical position
         self.p_pos = None
         # physical velocity
@@ -24,6 +25,7 @@ class Action(object):
         self.u = None
         # communication action
         self.c = None
+        # TODO: Weapon, Sensor and Electronic Warfare control actions
 
 # sensor object for agents wit limited vision
 class Sensor(object):
