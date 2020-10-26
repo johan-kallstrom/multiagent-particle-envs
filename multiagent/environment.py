@@ -26,9 +26,9 @@ class MultiAgentEnv(gym.Env):
         self.info_callback = info_callback
         self.done_callback = done_callback
         # environment parameters
-        self.discrete_action_space = True
+        self.discrete_action_space = world.discrete_action_space if hasattr(world, 'discrete_action_space') else True
         # if true, action is a number 0...N, otherwise action is a one-hot N-dimensional vector
-        self.discrete_action_input = False
+        self.discrete_action_input = world.discrete_action_input if hasattr(world, 'discrete_action_input') else False
         # if true, even the action is continuous, action will be performed discretely
         self.force_discrete_action = world.discrete_action if hasattr(world, 'discrete_action') else False
         # if true, every agent has the same reward
@@ -158,34 +158,28 @@ class MultiAgentEnv(gym.Env):
 
         if agent.movable:
             # physical action
-            if agent.is_dynamic:
-                if self.discrete_action_input:
-                    agent.action.u = np.zeros(self.world.dim_p)
-                    # process discrete action
-                    if action[0] == 1: agent.action.u[0] = -1.0
-                    if action[0] == 2: agent.action.u[0] = +1.0
-                    if action[0] == 3: agent.action.u[1] = -1.0
-                    if action[0] == 4: agent.action.u[1] = +1.0
-                else:
-                    if self.force_discrete_action:
-                        d = np.argmax(action[0])
-                        action[0][:] = 0.0
-                        action[0][d] = 1.0
-                    if self.discrete_action_space:
-                        agent.action.u[0] += action[0][1] - action[0][2]
-                        agent.action.u[1] += action[0][3] - action[0][4]
-                    else:
-                        agent.action.u = action[0]
-                sensitivity = 5.0
-                if agent.accel is not None:
-                    sensitivity = agent.accel
-                agent.action.u *= sensitivity
-                action = action[1:]
+            if self.discrete_action_input:
+                agent.action.u = np.zeros(self.world.dim_p)
+                # process discrete action
+                if action[0] == 1: agent.action.u[0] = -1.0
+                if action[0] == 2: agent.action.u[0] = +1.0
+                if action[0] == 3: agent.action.u[1] = -1.0
+                if action[0] == 4: agent.action.u[1] = +1.0
             else:
-                # spaces.Box(-1, +1, (2,), dtype=np.float32)
-                agent.action.u[0] += action[0][1] # heading cmd (+/-180 deg)
-                agent.action.u[1] += action[0][2] # speed cmd (min/max)
-                action = action[1:]
+                if self.force_discrete_action:
+                    d = np.argmax(action[0])
+                    action[0][:] = 0.0
+                    action[0][d] = 1.0
+                if self.discrete_action_space:
+                    agent.action.u[0] += action[0][1] - action[0][2]
+                    agent.action.u[1] += action[0][3] - action[0][4]
+                else:
+                    agent.action.u = action[0]
+            sensitivity = 5.0
+            if agent.accel is not None:
+                sensitivity = agent.accel
+            agent.action.u *= sensitivity
+            action = action[1:]
             
         if not agent.silent:
             # communication action

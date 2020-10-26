@@ -8,8 +8,6 @@ class EntityState(object):
         self.p_pos = None
         # physical velocity
         self.p_vel = None
-        # physical heading
-        self.p_head = None
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
@@ -65,9 +63,6 @@ class Entity(object):
         self.initial_mass = 1.0
         # sensor
         self.sensor = None
-    
-    def set_heading(self, p_vel):
-        pass
 
     @property
     def mass(self):
@@ -103,13 +98,15 @@ class Agent(Entity):
 
 # multi-agent world
 class World(object):
-    def __init__(self):
+    def __init__(self, is_dynamic=True):
+        # determines if forces are used to update world state
+        self.is_dynamic = is_dynamic
         # list of agents and entities (can change at execution-time!)
         self.agents = []
         self.landmarks = []
         # communication channel dimensionality
         self.dim_c = 0
-        # position dimensionality
+        # physical control dimensionality
         self.dim_p = 2
         # color dimensionality
         self.dim_color = 3
@@ -141,14 +138,18 @@ class World(object):
         # set actions for scripted agents 
         for agent in self.scripted_agents:
             agent.action = agent.action_callback(agent, self)
-        # gather forces applied to entities
-        p_force = [None] * len(self.entities)
-        # apply agent physical controls
-        p_force = self.apply_action_force(p_force)
-        # apply environment forces
-        p_force = self.apply_environment_force(p_force)
-        # integrate physical state
-        self.integrate_state(p_force)
+        if self.is_dynamic:
+            # gather forces applied to entities
+            p_force = [None] * len(self.entities)
+            # apply agent physical controls
+            p_force = self.apply_action_force(p_force)
+            # apply environment forces
+            p_force = self.apply_environment_force(p_force)
+            # integrate physical state
+            self.integrate_state(p_force)
+        else:
+            # update agents' physical states based on commanded velocity
+            self.integrate_state_from_vel_action()
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
@@ -190,7 +191,18 @@ class World(object):
                     entity.state.p_vel = entity.state.p_vel / np.sqrt(np.square(entity.state.p_vel[0]) +
                                                                   np.square(entity.state.p_vel[1])) * entity.max_speed
             entity.state.p_pos += entity.state.p_vel * self.dt
-            entity.set_heading(entity.state.p_vel)
+
+    # integrate physical state when action is commanded velocity
+    def integrate_state_from_vel_action(self):
+        for agent in self.agents:
+            if not agent.movable: continue
+            agent.state.p_vel = agent.action.u.copy()
+            if agent.max_speed is not None:
+                speed = np.sqrt(np.square(agent.state.p_vel[0]) + np.square(agent.state.p_vel[1]))
+                if speed > agent.max_speed:
+                    agent.state.p_vel = agent.state.p_vel / np.sqrt(np.square(agent.state.p_vel[0]) +
+                                                                  np.square(agent.state.p_vel[1])) * agent.max_speed
+            agent.state.p_pos += agent.state.p_vel * self.dt
 
     def update_agent_state(self, agent):
         # set communication state (directly for now)
