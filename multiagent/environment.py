@@ -272,6 +272,8 @@ class MultiAgentEnv(gym.Env):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
                 if entity.sensor is not None:
                     self.sensor_render_geoms_xform[e].set_translation(*entity.state.p_pos)
+                    rotation = np.sign(entity.state.p_vel[1]) * np.arccos(entity.state.p_vel[0] / np.linalg.norm(entity.state.p_vel))
+                    self.sensor_render_geoms_xform[e].set_rotation(rotation)
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 

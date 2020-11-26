@@ -197,11 +197,15 @@ class World(object):
         for agent in self.agents:
             if not agent.movable: continue
             agent.state.p_vel = agent.action.u.copy()
+            speed = np.sqrt(np.square(agent.state.p_vel[0]) + np.square(agent.state.p_vel[1]))
             if agent.max_speed is not None:
-                speed = np.sqrt(np.square(agent.state.p_vel[0]) + np.square(agent.state.p_vel[1]))
                 if speed > agent.max_speed:
                     agent.state.p_vel = agent.state.p_vel / np.sqrt(np.square(agent.state.p_vel[0]) +
                                                                   np.square(agent.state.p_vel[1])) * agent.max_speed
+            if agent.min_speed is not None:
+                if speed < agent.min_speed:
+                    agent.state.p_vel = agent.state.p_vel / np.sqrt(np.square(agent.state.p_vel[0]) +
+                                                                  np.square(agent.state.p_vel[1])) * agent.min_speed            
             agent.state.p_pos += agent.state.p_vel * self.dt
 
     def update_agent_state(self, agent):
