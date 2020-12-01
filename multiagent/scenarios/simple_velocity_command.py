@@ -1,17 +1,18 @@
 import numpy as np
-from multiagent.core import World, Agent, Landmark, Sensor
+from multiagent.core import World, Agent, VelocityAction, Landmark, Sensor
 from multiagent.scenario import BaseScenario
 
 class Scenario(BaseScenario):
     def make_world(self):
         world = World(is_dynamic=False)
-        world.discrete_action_space = False
+        world.discrete_action_space = True
         # add agents
         world.agents = [Agent() for i in range(1)]
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.silent = True
+            agent.action = VelocityAction()
             agent.max_speed = 0.1
             agent.min_speed = 0.01
             agent.sensor = Sensor([np.pi / 6], [0.5])

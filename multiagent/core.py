@@ -1,4 +1,5 @@
 import numpy as np
+from gym import spaces
 
 # physical/external base state of all entites
 class EntityState(object):
@@ -24,6 +25,25 @@ class Action(object):
         # communication action
         self.c = None
         # TODO: Weapon, Sensor and Electronic Warfare control actions
+        # action space
+        self.action_space = None
+
+    def set_action(self, action):
+        pass
+
+# action of the agent
+class VelocityAction(object):
+    def __init__(self):
+        # physical action (speed and heading)
+        self.u = None
+        # communication action
+        self.c = None
+        # TODO: Weapon, Sensor and Electronic Warfare control actions
+        # action space
+        self.action_space = spaces.Box(low=-1.0, high=+1.0, shape=(2,))
+
+    def set_action(self, action):
+        self.u = action
 
 # sensor object for agents wit limited vision
 class Sensor(object):
@@ -196,16 +216,11 @@ class World(object):
     def integrate_state_from_vel_action(self):
         for agent in self.agents:
             if not agent.movable: continue
-            agent.state.p_vel = agent.action.u.copy()
-            speed = np.sqrt(np.square(agent.state.p_vel[0]) + np.square(agent.state.p_vel[1]))
-            if agent.max_speed is not None:
-                if speed > agent.max_speed:
-                    agent.state.p_vel = agent.state.p_vel / np.sqrt(np.square(agent.state.p_vel[0]) +
-                                                                  np.square(agent.state.p_vel[1])) * agent.max_speed
-            if agent.min_speed is not None:
-                if speed < agent.min_speed:
-                    agent.state.p_vel = agent.state.p_vel / np.sqrt(np.square(agent.state.p_vel[0]) +
-                                                                  np.square(agent.state.p_vel[1])) * agent.min_speed            
+            speed_delta = (agent.max_speed - agent.min_speed) / 2
+            speed = agent.action.u[0] * speed_delta + (agent.min_speed + speed_delta)
+            heading = agent.action.u[1] * np.pi
+            agent.state.p_vel[0] = speed * np.cos(heading)
+            agent.state.p_vel[1] = speed * np.sin(heading)
             agent.state.p_pos += agent.state.p_vel * self.dt
 
     def update_agent_state(self, agent):

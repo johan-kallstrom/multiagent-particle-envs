@@ -204,6 +204,7 @@ class MultiAgentEnv(gym.Env):
         if mode == 'human':
             alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
             message = ''
+            message_constructed = False
             for agent in self.world.agents:
                 comm = []
                 for other in self.world.agents:
@@ -213,7 +214,9 @@ class MultiAgentEnv(gym.Env):
                     else:
                         word = alphabet[np.argmax(other.state.c)]
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
-            print(message)
+                    message_constructed = True
+            if message_constructed:
+                print(message)
 
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
@@ -300,6 +303,29 @@ class MultiAgentEnv(gym.Env):
                     dx.append(np.array([x,y]))
         return dx
 
+
+# environment that uses action calbacks for all agents in the multiagent world
+# currently code assumes that no agents will be created/destroyed at runtime!
+class ACMultiAgentEnv(MultiAgentEnv):
+    metadata = {
+        'render.modes' : ['human', 'rgb_array']
+    }
+
+    def __init__(self, world, reset_callback=None, reward_callback=None,
+                 observation_callback=None, info_callback=None,
+                 done_callback=None, shared_viewer=True):
+        super(ACMultiAgentEnv, self).__init__(world=world, reset_callback=reset_callback, reward_callback=reward_callback,
+                                              observation_callback=observation_callback, info_callback=info_callback,
+                                              done_callback=done_callback, shared_viewer=shared_viewer)
+        # let each scenario define its own action space
+        self.action_space = []
+        for agent in self.agents:
+            self.action_space.append(agent.action.action_space)
+
+    # set env action for a particular agent
+    def _set_action(self, action, agent, action_space, time=None):
+        # let each scenario define how to set actions
+        agent.action.set_action(action)
 
 # vectorized wrapper for a batch of multi-agent environments
 # assumes all environments have the same observation and action space
