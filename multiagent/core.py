@@ -51,6 +51,7 @@ class Sensor(object):
         self.max_range = max_sensor_ranges[default_mode]
         self.min_range = min_sensor_ranges[default_mode]
         self.heading = sensor_heading
+        self.detections = []
         self.set_mode(default_mode)
 
     def set_mode(self, mode):
@@ -59,9 +60,9 @@ class Sensor(object):
         self.min_range = self.min_sensor_ranges[mode]
 
     def check_detection(self, entity, other):
-        self.detections = []
         if self.other_in_range(entity, other) and self.other_in_fov(entity, other):
             self.detections.append(other)
+            other.state.observed = True # TODO: make this less of a strange side effect
 
     def other_in_range(self, entity, other):
         distance = np.sqrt(np.sum(np.square(entity.state.p_pos - other.state.p_pos)))
@@ -190,11 +191,15 @@ class World(object):
         for agent in self.agents:
             self.update_agent_state(agent)
         # update sensor detections
-        # for entity in self.entities:
-        #     if entity.sensor is None: continue
-        #     for other in self.entities:
-        #         if entity == other: continue
-        #         entity.sensor.check_detection(entity, other)            
+        for entity in self.entities: # TODO: make this more efficient
+            entity.state.observed = False
+        for entity in self.entities:
+            if entity.sensor is None: continue
+            entity.sensor.detections = []
+            for other in self.entities:
+                if entity == other: continue
+                entity.sensor.check_detection(entity, other)
+                # TODO: add code to check if other detects entity's sensor          
 
     # gather agent action forces
     def apply_action_force(self, p_force):

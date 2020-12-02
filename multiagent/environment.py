@@ -273,10 +273,21 @@ class MultiAgentEnv(gym.Env):
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
+                if entity.state.observed:
+                    one_time_geom = self.viewers[i].draw_circle(radius=entity.size*1.5, res=30, filled=False)
+                    xform = rendering.Transform()
+                    xform.set_translation(*entity.state.p_pos)
+                    one_time_geom.add_attr(xform)
+                    one_time_geom.set_color(0.75, 0.25, 0.25)
+                    one_time_geom.set_linewidth(5.0)
                 if entity.sensor is not None:
                     self.sensor_render_geoms_xform[e].set_translation(*entity.state.p_pos)
                     rotation = np.sign(entity.state.p_vel[1]) * np.arccos(entity.state.p_vel[0] / np.linalg.norm(entity.state.p_vel))
                     self.sensor_render_geoms_xform[e].set_rotation(rotation)
+                    if len(entity.sensor.detections) > 0:
+                        self.sensor_render_geoms[e].set_color(0.75, 0.25, 0.25, alpha=0.2)
+                    else:
+                        self.sensor_render_geoms[e].set_color(*entity.color, alpha=0.2)
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
