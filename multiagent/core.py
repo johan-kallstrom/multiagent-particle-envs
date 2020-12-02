@@ -9,6 +9,8 @@ class EntityState(object):
         self.p_pos = None
         # physical velocity
         self.p_vel = None
+        # indication of being observed
+        self.observed = False
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
@@ -24,12 +26,6 @@ class Action(object):
         self.u = None
         # communication action
         self.c = None
-        # TODO: Weapon, Sensor and Electronic Warfare control actions
-        # action space
-        self.action_space = None
-
-    def set_action(self, action):
-        pass
 
 # action of the agent
 class VelocityAction(object):
@@ -47,16 +43,36 @@ class VelocityAction(object):
 
 # sensor object for agents wit limited vision
 class Sensor(object):
-    def __init__(self, sensor_fovs, sensor_ranges, default_mode=0, sensor_heading=None):
+    def __init__(self, sensor_fovs, max_sensor_ranges, min_sensor_ranges, default_mode=0, sensor_heading=None):
         self.sensor_fovs = sensor_fovs
-        self.sensor_ranges = sensor_ranges
+        self.max_sensor_ranges = max_sensor_ranges
+        self.min_sensor_ranges = min_sensor_ranges
         self.fov = sensor_fovs[default_mode]
-        self.range = sensor_ranges[default_mode]
+        self.max_range = max_sensor_ranges[default_mode]
+        self.min_range = min_sensor_ranges[default_mode]
         self.heading = sensor_heading
+        self.set_mode(default_mode)
 
     def set_mode(self, mode):
         self.fov = self.sensor_fovs[mode]
-        self.range = self.sensor_ranges[mode]
+        self.max_range = self.max_sensor_ranges[mode]
+        self.min_range = self.min_sensor_ranges[mode]
+
+    def check_detection(self, entity, other):
+        self.detections = []
+        if self.other_in_range(entity, other) and self.other_in_fov(entity, other):
+            self.detections.append(other)
+
+    def other_in_range(self, entity, other):
+        distance = np.sqrt(np.sum(np.square(entity.state.p_pos - other.state.p_pos)))
+        return (distance <= self.max_range) and (distance >= self.min_range)
+
+    def other_in_fov(self, entity, other):
+        e_to_ot_vector = other.state.p_pos-entity.state.p_pos
+        dot_product = np.dot(entity.state.p_vel, e_to_ot_vector)
+        norms_product = np.linalg.norm(entity.state.p_vel) * np.linalg.norm(e_to_ot_vector)
+        angle = np.arccos(dot_product / norms_product)
+        return angle < self.fov / 2
 
 # properties and state of physical world entity
 class Entity(object):
@@ -173,6 +189,12 @@ class World(object):
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
+        # update sensor detections
+        # for entity in self.entities:
+        #     if entity.sensor is None: continue
+        #     for other in self.entities:
+        #         if entity == other: continue
+        #         entity.sensor.check_detection(entity, other)            
 
     # gather agent action forces
     def apply_action_force(self, p_force):

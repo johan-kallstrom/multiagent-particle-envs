@@ -15,9 +15,9 @@ class Scenario(BaseScenario):
             agent.action = VelocityAction()
             agent.max_speed = 0.1
             agent.min_speed = 0.01
-            agent.sensor = Sensor([np.pi / 6], [0.5])
+            agent.sensor = Sensor([2 * np.pi / 3], [0.5], [2.5e-5])
         # add landmarks
-        world.landmarks = [Landmark() for i in range(1)]
+        world.landmarks = [Landmark() for i in range(3)]
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
             landmark.collide = False

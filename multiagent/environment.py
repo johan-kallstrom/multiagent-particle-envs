@@ -288,7 +288,7 @@ class MultiAgentEnv(gym.Env):
             return []
         receptor_type = 'polar'
         # range_min = 0.05 * 2.0
-        range_max = agent.sensor.range
+        range_max = agent.sensor.max_range
         dx = []
         # circular receptive field
         if receptor_type == 'polar':
