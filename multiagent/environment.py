@@ -273,7 +273,7 @@ class MultiAgentEnv(gym.Env):
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
                 self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
-                if entity.state.observed:
+                if (entity.rwr is not None) and (len(entity.rwr.observers) > 0):
                     one_time_geom = self.viewers[i].draw_circle(radius=entity.size*1.5, res=30, filled=False)
                     xform = rendering.Transform()
                     xform.set_translation(*entity.state.p_pos)

@@ -62,7 +62,7 @@ class Sensor(object):
     def check_detection(self, entity, other):
         if self.other_in_range(entity, other) and self.other_in_fov(entity, other):
             self.detections.append(other)
-            other.state.observed = True # TODO: make this less of a strange side effect
+            # other.state.observed = True # TODO: make this less of a strange side effect
 
     def other_in_range(self, entity, other):
         distance = np.sqrt(np.sum(np.square(entity.state.p_pos - other.state.p_pos)))
@@ -74,6 +74,28 @@ class Sensor(object):
         norms_product = np.linalg.norm(entity.state.p_vel) * np.linalg.norm(e_to_ot_vector)
         angle = np.arccos(dot_product / norms_product)
         return angle < self.fov / 2
+
+# radar warner
+class Rwr(object):
+    def __init__(self, max_range, min_range):
+        self.max_range = max_range
+        self.min_range = min_range
+        self.observers = []
+
+    def check_observed(self, entity, other):
+        if self.im_in_range(entity, other) and self.im_in_fov(entity, other):
+            self.observers.append(other)
+
+    def im_in_range(self, entity, other):
+        distance = np.sqrt(np.sum(np.square(entity.state.p_pos - other.state.p_pos)))
+        return (distance <= self.max_range) and (distance >= self.min_range)
+
+    def im_in_fov(self, entity, other):
+        ot_to_e_vector = entity.state.p_pos - other.state.p_pos
+        dot_product = np.dot(ot_to_e_vector, other.state.p_vel)
+        norms_product = np.linalg.norm(other.state.p_vel) * np.linalg.norm(ot_to_e_vector)
+        angle = np.arccos(dot_product / norms_product)
+        return angle < other.sensor.fov / 2
 
 # properties and state of physical world entity
 class Entity(object):
@@ -100,6 +122,8 @@ class Entity(object):
         self.initial_mass = 1.0
         # sensor
         self.sensor = None
+        # radar warner
+        self.rwr = None
 
     @property
     def mass(self):
@@ -192,14 +216,16 @@ class World(object):
             self.update_agent_state(agent)
         # update sensor detections
         for entity in self.entities: # TODO: make this more efficient
-            entity.state.observed = False
+            if entity.rwr is None: continue
+            entity.rwr.observers = []
         for entity in self.entities:
             if entity.sensor is None: continue
             entity.sensor.detections = []
             for other in self.entities:
                 if entity == other: continue
                 entity.sensor.check_detection(entity, other)
-                # TODO: add code to check if other detects entity's sensor          
+                if other.rwr is None: continue
+                other.rwr.check_observed(other, entity)      
 
     # gather agent action forces
     def apply_action_force(self, p_force):

@@ -1,5 +1,5 @@
 import numpy as np
-from multiagent.core import World, Agent, VelocityAction, Landmark, Sensor
+from multiagent.core import World, Agent, VelocityAction, Landmark, Sensor, Rwr
 from multiagent.scenario import BaseScenario
 
 class Scenario(BaseScenario):
@@ -22,6 +22,7 @@ class Scenario(BaseScenario):
             landmark.name = 'landmark %d' % i
             landmark.collide = False
             landmark.movable = False
+            landmark.rwr = Rwr(max_range=0.5, min_range=2.5e-5)
         # make initial conditions
         self.reset_world(world)
         return world
