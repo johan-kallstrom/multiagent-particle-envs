@@ -46,12 +46,9 @@ class Scenario(BaseScenario):
             landmark.state.p_vel = np.zeros(world.dim_p)
         # reset missiles
         self.missiles = []
-        # reset steps
-        world.steps = 0
 
     def reward(self, agent, world):
         dist2 = np.sum(np.square(agent.state.p_pos - world.landmarks[0].state.p_pos))
-        # print(dist2)
         return -dist2
 
     def observation(self, agent, world):

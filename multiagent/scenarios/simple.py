@@ -1,5 +1,5 @@
 import numpy as np
-from multiagent.core import World, Agent, Landmark, Sensor
+from multiagent.core import World, Agent, Landmark
 from multiagent.scenario import BaseScenario
 
 class Scenario(BaseScenario):
@@ -11,7 +11,6 @@ class Scenario(BaseScenario):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.silent = True
-            agent.sensor = Sensor([np.pi / 6], [0.5])
         # add landmarks
         world.landmarks = [Landmark() for i in range(1)]
         for i, landmark in enumerate(world.landmarks):

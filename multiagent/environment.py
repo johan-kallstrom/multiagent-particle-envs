@@ -288,6 +288,15 @@ class MultiAgentEnv(gym.Env):
                         self.sensor_render_geoms[e].set_color(0.75, 0.25, 0.25, alpha=0.2)
                     else:
                         self.sensor_render_geoms[e].set_color(*entity.color, alpha=0.2)
+            # render expendables
+            for missile in self.world.missiles:
+                one_time_geom = self.viewers[i].draw_circle(radius=entity.size, res=30, filled=False)
+                xform = rendering.Transform()
+                xform.set_translation(*missile.state.p_pos)
+                one_time_geom.add_attr(xform)
+                one_time_geom.set_color(*missile.color)
+                one_time_geom.set_linewidth(5.0)
+                print("####### Render missile ")
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
@@ -315,7 +324,7 @@ class MultiAgentEnv(gym.Env):
         return dx
 
 
-# environment that uses action calbacks for all agents in the multiagent world
+# environment that uses tuple/dict action spaces for all agents in the multiagent world
 # currently code assumes that no agents will be created/destroyed at runtime!
 class ACMultiAgentEnv(MultiAgentEnv):
     metadata = {
@@ -331,12 +340,13 @@ class ACMultiAgentEnv(MultiAgentEnv):
         # let each scenario define its own action space
         self.action_space = []
         for agent in self.agents:
-            self.action_space.append(agent.action.action_space)
+            self.action_space.append(agent.platform_action.action_space)
 
     # set env action for a particular agent
     def _set_action(self, action, agent, action_space, time=None):
         # let each scenario define how to set actions
-        agent.action.set_action(action)
+        # agent.platform_action.set_action(action["platform_action"])
+        agent.platform_action.set_action(action)
 
 # vectorized wrapper for a batch of multi-agent environments
 # assumes all environments have the same observation and action space

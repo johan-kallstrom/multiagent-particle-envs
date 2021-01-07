@@ -32,11 +32,21 @@ class VelocityAction(object):
     def __init__(self):
         # physical action (speed and heading)
         self.u = None
-        # communication action
-        self.c = None
-        # TODO: Weapon, Sensor and Electronic Warfare control actions
+        # action space: Speed [min to max] and Heading [between -pi and pi]
+        self.action_space = spaces.Box(low=np.array([0.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
+
+    def set_action(self, action):
+        self.u = action
+
+# TODO: Weapon, Sensor and Electronic Warfare control actions
+
+# action of the agent
+class FireAction(object):
+    def __init__(self):
+        # fire action (fire (1) or not (0))
+        self.u = None
         # action space
-        self.action_space = spaces.Box(low=-1.0, high=+1.0, shape=(2,))
+        self.action_space = spaces.Discrete(2)
 
     def set_action(self, action):
         self.u = action
@@ -99,7 +109,7 @@ class Rwr(object):
 
 # properties and state of physical world entity
 class Entity(object):
-    def __init__(self):
+    def __init__(self, is_dynamic=True):
         # name 
         self.name = ''
         # properties:
@@ -110,14 +120,15 @@ class Entity(object):
         self.collide = True
         # material density (affects mass)
         self.density = 25.0
-        # color
+        # color and rendering
         self.color = None
+        self.onetime_render = False
         # max/min speed and accel
         self.max_speed = None
         self.min_speed = None
         self.accel = None
         # state
-        self.state = EntityState()
+        self.state = EntityState(is_dynamic=is_dynamic)
         # mass
         self.initial_mass = 1.0
         # sensor
@@ -133,6 +144,29 @@ class Entity(object):
 class Landmark(Entity):
      def __init__(self):
         super(Landmark, self).__init__()
+
+# properties of missile entities,
+# scenario should define sensor and its proprties
+class Missile(Entity):
+    def __init__(self, target):
+        super(Missile, self).__init__()
+        self.target = target
+        self.lethal_range = self.size
+        self.color = np.array([0.25,0.25,0.25])
+        self.onetime_render = True
+        self.size = 0.5 * self.size
+        self.destroyed = False
+        self.state.p_pos = np.array([0.0, 0.0])
+
+    def update_state(self, world):
+        print("##################################### Updating missile state ################")
+        speed = 2.0 * 0.005 #self.target.max_speed
+        m_to_tgt = self.target.state.p_pos - self.state.p_pos
+        if np.linalg.norm(m_to_tgt) < self.lethal_range:
+            self.destroyed = True
+            return
+        direction = (1/np.linalg.norm(m_to_tgt)) * m_to_tgt
+        self.state.p_pos += speed * direction * world.dt
 
 # properties of agent entities
 class Agent(Entity):
@@ -152,8 +186,16 @@ class Agent(Entity):
         self.u_range = 1.0
         # state
         self.state = AgentState()
-        # action
-        self.action = Action()
+        # actions
+        # ------------------------------------------------------------------------------------------
+        self.action = Action()          # standard particle envs force and communication actions
+        # ------------------------------------------------------------------------------------------
+        self.platform_action = None     # Tuple action space: Action for platform control
+        self.com_action = None          # Tuple action space: Action for communication among agents
+        self.sensor_action = None       # Tuple action space: Action for sensor control
+        self.ew_action = None           # Tuple action space: Action for EW control
+        self.fire_action = None         # Tuple action space: Action for weapon fire control
+        # ------------------------------------------------------------------------------------------
         # script behavior to execute
         self.action_callback = None
 
@@ -165,6 +207,7 @@ class World(object):
         # list of agents and entities (can change at execution-time!)
         self.agents = []
         self.landmarks = []
+        self.missiles = []
         # communication channel dimensionality
         self.dim_c = 0
         # physical control dimensionality
@@ -178,6 +221,8 @@ class World(object):
         # contact response parameters
         self.contact_force = 1e+2
         self.contact_margin = 1e-3
+        # episode step
+        self.steps = 0
 
     # return all entities in the world
     @property
@@ -225,7 +270,16 @@ class World(object):
                 if entity == other: continue
                 entity.sensor.check_detection(entity, other)
                 if other.rwr is None: continue
-                other.rwr.check_observed(other, entity)      
+                other.rwr.check_observed(other, entity)
+        # for agent in self.agents:
+        #     if agent.sensor is not None:
+        #         for detection in agent.sensor.detections:
+        #             missile = Missile(detection)
+        #             self.missiles.append(missile)
+        # update states of expendables
+        self.missiles = self.update_missile_states()
+        # update world steps
+        self.steps += 1
 
     # gather agent action forces
     def apply_action_force(self, p_force):
@@ -270,8 +324,8 @@ class World(object):
         for agent in self.agents:
             if not agent.movable: continue
             speed_delta = (agent.max_speed - agent.min_speed) / 2
-            speed = agent.action.u[0] * speed_delta + (agent.min_speed + speed_delta)
-            heading = agent.action.u[1] * np.pi
+            speed = agent.platform_action.u[0] * speed_delta + (agent.min_speed + speed_delta)
+            heading = agent.platform_action.u[1] * np.pi
             agent.state.p_vel[0] = speed * np.cos(heading)
             agent.state.p_vel[1] = speed * np.sin(heading)
             agent.state.p_pos += agent.state.p_vel * self.dt
@@ -282,7 +336,15 @@ class World(object):
             agent.state.c = np.zeros(self.dim_c)
         else:
             noise = np.random.randn(*agent.action.c.shape) * agent.c_noise if agent.c_noise else 0.0
-            agent.state.c = agent.action.c + noise      
+            agent.state.c = agent.action.c + noise   
+
+    def update_missile_states(self):
+        live_missiles = []
+        for missile in self.missiles:
+            missile.update_state(self)
+            if not missile.destroyed:
+                live_missiles.append(missile)
+        return live_missiles
 
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):
