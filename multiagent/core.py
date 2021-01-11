@@ -38,6 +38,52 @@ class VelocityAction(object):
     def set_action(self, action):
         self.u = action
 
+    def update_agent_state(self, agent, dt):
+        if not agent.movable: return
+        speed_delta = (agent.max_speed - agent.min_speed) / 2
+        speed = agent.platform_action.u[0] * speed_delta + (agent.min_speed + speed_delta)
+        heading = agent.platform_action.u[1] * np.pi
+        agent.state.p_vel[0] = speed * np.cos(heading)
+        agent.state.p_vel[1] = speed * np.sin(heading)
+        agent.state.p_pos += agent.state.p_vel * dt     
+
+# action of the agent
+class AccelerationAction(object):
+    def __init__(self):
+        # physical action (acceleration)
+        self.u = None
+        self.north = np.array([1.0, 0.0])
+        # action space: Acceleration for speed and turn rate [min to max]
+        self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
+
+    def set_action(self, action):
+        self.u = action
+
+    def update_agent_state(self, agent, dt):
+        if not agent.movable: return
+        T = self.u[0] # commanded thrust
+        n = self.u[1] # commanded load factor
+
+        # throttle action
+        speed = np.linalg.norm(agent.state.p_vel) + T * dt
+        if speed > agent.max_speed:
+            speed = agent.max_speed
+        elif speed < agent.min_speed:
+            speed = agent.min_speed
+
+        # turn action
+        w = np.sign(n) * (9.81 * np.sqrt(n**2 - 1)) / speed
+        dot_product = np.dot(agent.state.p_vel, self.north)
+        heading = np.sign(agent.state.p_vel[1]) * np.arccos(dot_product / speed) + w * dt
+        if heading > np.pi:
+            heading = np.pi
+        elif heading < -np.pi:
+            heading = -np.pi
+        # update velocity
+        agent.state.p_vel[0] = speed * np.cos(heading)
+        agent.state.p_vel[1] = speed * np.sin(heading)
+        agent.state.p_pos += agent.state.p_vel * dt
+
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
 # action of the agent
@@ -254,8 +300,10 @@ class World(object):
             # integrate physical state
             self.integrate_state(p_force)
         else:
-            # update agents' physical states based on commanded velocity
-            self.integrate_state_from_vel_action()
+            # update agents' physical states based on commanded action
+            for agent in self.agents:
+                agent.platform_action.update_agent_state(agent, self.dt)
+            # self.integrate_state_from_vel_action()
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
