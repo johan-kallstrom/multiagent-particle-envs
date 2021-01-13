@@ -296,7 +296,6 @@ class MultiAgentEnv(gym.Env):
                 one_time_geom.add_attr(xform)
                 one_time_geom.set_color(*missile.color)
                 one_time_geom.set_linewidth(5.0)
-                print("####### Render missile ")
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 

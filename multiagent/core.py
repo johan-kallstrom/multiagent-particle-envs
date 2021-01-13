@@ -61,8 +61,11 @@ class AccelerationAction(object):
 
     def update_agent_state(self, agent, dt):
         if not agent.movable: return
-        T = self.u[0] # commanded thrust
-        n = self.u[1] # commanded load factor
+        T = self.u[0] * agent.accel[0] # commanded thrust
+        if self.u[1] > 0:              # commanded load factor
+            n = 1.0 + self.u[1] * agent.accel[1]
+        else:
+            n = -1.0 + self.u[1] * agent.accel[1]
 
         # throttle action
         speed = np.linalg.norm(agent.state.p_vel) + T * dt
@@ -72,17 +75,18 @@ class AccelerationAction(object):
             speed = agent.min_speed
 
         # turn action
-        w = np.sign(n) * (9.81 * np.sqrt(n**2 - 1)) / speed
-        dot_product = np.dot(agent.state.p_vel, self.north)
-        heading = np.sign(agent.state.p_vel[1]) * np.arccos(dot_product / speed) + w * dt
+        w = np.sign(n) * 9.81 * np.sqrt(n**2 - 1) / speed
+        cos_heading = np.dot(agent.state.p_vel, self.north) / np.linalg.norm(agent.state.p_vel)
+        heading = np.sign(agent.state.p_vel[1]) * np.arccos(cos_heading) + w * dt
         if heading > np.pi:
-            heading = np.pi
+            heading = heading - 2 * np.pi
         elif heading < -np.pi:
-            heading = -np.pi
-        # update velocity
+            heading = heading  + 2 * np.pi
+
+        # update velocity and position
         agent.state.p_vel[0] = speed * np.cos(heading)
         agent.state.p_vel[1] = speed * np.sin(heading)
-        agent.state.p_pos += agent.state.p_vel * dt
+        agent.state.p_pos += (agent.state.p_vel * dt) / 100000.0
 
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
@@ -205,7 +209,6 @@ class Missile(Entity):
         self.state.p_pos = np.array([0.0, 0.0])
 
     def update_state(self, world):
-        print("##################################### Updating missile state ################")
         speed = 2.0 * 0.005 #self.target.max_speed
         m_to_tgt = self.target.state.p_pos - self.state.p_pos
         if np.linalg.norm(m_to_tgt) < self.lethal_range:

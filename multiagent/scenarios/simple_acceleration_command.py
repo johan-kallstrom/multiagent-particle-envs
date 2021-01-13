@@ -14,8 +14,9 @@ class Scenario(BaseScenario):
             agent.collide = False
             agent.silent = True
             agent.platform_action = AccelerationAction()
-            agent.max_speed = 0.005
-            agent.min_speed = 0.1 * agent.max_speed
+            agent.max_speed = 700.0
+            agent.min_speed = 0.25 * agent.max_speed
+            agent.accel = [1.0*9.81, 8]
             agent.sensor = Sensor([2 * np.pi / 3], [0.5], [2.5e-5])
         # add landmarks
         world.landmarks = [Landmark() for i in range(1)]
@@ -39,7 +40,7 @@ class Scenario(BaseScenario):
         # set random initial states
         for agent in world.agents:
             agent.state.p_pos = np.random.uniform(-1,+1, world.dim_p)
-            agent.state.p_vel = np.zeros(world.dim_p)
+            agent.state.p_vel = np.ones(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
             landmark.state.p_pos = np.random.uniform(-1,+1, world.dim_p)
