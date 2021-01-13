@@ -4,7 +4,7 @@ from multiagent.scenario import BaseScenario
 
 class Scenario(BaseScenario):
     def make_world(self):
-        world = World(is_dynamic=False)
+        world = World(is_dynamic=False, position_scale=200000.0)
         world.discrete_action_space = True
         world.dt = 1.0
         # add agents
@@ -17,14 +17,14 @@ class Scenario(BaseScenario):
             agent.max_speed = 700.0
             agent.min_speed = 0.25 * agent.max_speed
             agent.accel = [1.0*9.81, 8]
-            agent.sensor = Sensor([2 * np.pi / 3], [0.5], [2.5e-5])
+            agent.sensor = Sensor([2 * np.pi / 3], [100000.0], [2.5e-5])
         # add landmarks
         world.landmarks = [Landmark() for i in range(1)]
         for i, landmark in enumerate(world.landmarks):
             landmark.name = 'landmark %d' % i
             landmark.collide = False
             landmark.movable = False
-            landmark.rwr = Rwr(max_range=0.5, min_range=2.5e-5)
+            landmark.rwr = Rwr(max_range=200000.0, min_range=2.5e-5)
         # make initial conditions
         self.reset_world(world)
         return world
@@ -43,7 +43,7 @@ class Scenario(BaseScenario):
             agent.state.p_vel = np.ones(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np.random.uniform(-1,+1, world.dim_p)
+            landmark.state.p_pos = np.random.uniform(-1*world.position_scale,+1*world.position_scale, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
         # reset missiles
         self.missiles = []
@@ -51,7 +51,7 @@ class Scenario(BaseScenario):
         world.steps = 0
 
     def reward(self, agent, world):
-        dist2 = np.sum(np.square(agent.state.p_pos - world.landmarks[0].state.p_pos))
+        dist2 = np.sum(np.square(agent.state.p_pos - world.landmarks[0].state.p_pos)) / (2*world.position_scale)
         # print(dist2)
         return -dist2
 
@@ -59,5 +59,5 @@ class Scenario(BaseScenario):
         # get positions of all entities in this agent's reference frame
         entity_pos = []
         for entity in world.landmarks:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
+            entity_pos.append((entity.state.p_pos - agent.state.p_pos) / (2*world.position_scale))
         return np.concatenate([agent.state.p_vel] + entity_pos)

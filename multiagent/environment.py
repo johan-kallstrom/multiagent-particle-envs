@@ -243,7 +243,7 @@ class MultiAgentEnv(gym.Env):
                 self.render_geoms.append(geom)
                 self.render_geoms_xform.append(xform)
                 if entity.sensor is not None:
-                    v = self._make_receptor_locations(entity)
+                    v = self._make_receptor_locations(entity, self.world.position_scale)
                     sensor_geom = rendering.make_polygon(v=v, filled=True)
                     sensor_geom.set_color(*entity.color, alpha=0.2)
                     sensor_xform = rendering.Transform()
@@ -268,31 +268,32 @@ class MultiAgentEnv(gym.Env):
             if self.shared_viewer:
                 pos = np.zeros(self.world.dim_p)
             else:
-                pos = self.agents[i].state.p_pos
+                pos = self.agents[i].state.p_pos / self.world.position_scale
             self.viewers[i].set_bounds(pos[0]-cam_range,pos[0]+cam_range,pos[1]-cam_range,pos[1]+cam_range)
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
-                self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
+                self.render_geoms_xform[e].set_translation(*(entity.state.p_pos / self.world.position_scale))
                 if (entity.rwr is not None) and (len(entity.rwr.observers) > 0):
                     one_time_geom = self.viewers[i].draw_circle(radius=entity.size*1.5, res=30, filled=False)
                     xform = rendering.Transform()
-                    xform.set_translation(*entity.state.p_pos)
+                    xform.set_translation(*(entity.state.p_pos / self.world.position_scale))
                     one_time_geom.add_attr(xform)
                     one_time_geom.set_color(0.75, 0.25, 0.25)
                     one_time_geom.set_linewidth(5.0)
                 if entity.sensor is not None:
-                    self.sensor_render_geoms_xform[e].set_translation(*entity.state.p_pos)
+                    self.sensor_render_geoms_xform[e].set_translation(*(entity.state.p_pos / self.world.position_scale))
                     rotation = np.sign(entity.state.p_vel[1]) * np.arccos(entity.state.p_vel[0] / np.linalg.norm(entity.state.p_vel))
                     self.sensor_render_geoms_xform[e].set_rotation(rotation)
                     if len(entity.sensor.detections) > 0:
                         self.sensor_render_geoms[e].set_color(0.75, 0.25, 0.25, alpha=0.2)
                     else:
                         self.sensor_render_geoms[e].set_color(*entity.color, alpha=0.2)
+                    print("Detecions for entity: ", entity.name, entity.sensor.detections)
             # render expendables
             for missile in self.world.missiles:
                 one_time_geom = self.viewers[i].draw_circle(radius=entity.size, res=30, filled=False)
                 xform = rendering.Transform()
-                xform.set_translation(*missile.state.p_pos)
+                xform.set_translation(*(missile.state.p_pos / self.world.position_scale))
                 one_time_geom.add_attr(xform)
                 one_time_geom.set_color(*missile.color)
                 one_time_geom.set_linewidth(5.0)
@@ -302,12 +303,12 @@ class MultiAgentEnv(gym.Env):
         return results
 
     # create receptor field locations in local coordinate frame
-    def _make_receptor_locations(self, agent):
+    def _make_receptor_locations(self, agent, scale):
         if agent.sensor is None:
             return []
         receptor_type = 'polar'
         # range_min = 0.05 * 2.0
-        range_max = agent.sensor.max_range
+        range_max = agent.sensor.max_range / scale
         dx = []
         # circular receptive field
         if receptor_type == 'polar':

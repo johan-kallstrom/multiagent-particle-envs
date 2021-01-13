@@ -86,7 +86,48 @@ class AccelerationAction(object):
         # update velocity and position
         agent.state.p_vel[0] = speed * np.cos(heading)
         agent.state.p_vel[1] = speed * np.sin(heading)
-        agent.state.p_pos += (agent.state.p_vel * dt) / 100000.0
+        agent.state.p_pos += agent.state.p_vel * dt
+
+# action of the agent
+class PnGuidanceAction(object):
+    def __init__(self):
+        # physical action (acceleration)
+        self.u = None
+        self.north = np.array([1.0, 0.0])
+        # action space: Acceleration for speed and turn rate [min to max]
+        self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
+
+    def set_action(self, action):
+        self.u = action
+
+    def update_agent_state(self, agent, dt):
+        if not agent.movable: return
+        T = self.u[0] * agent.accel[0] # commanded thrust
+        if self.u[1] > 0:              # commanded load factor
+            n = 1.0 + self.u[1] * agent.accel[1]
+        else:
+            n = -1.0 + self.u[1] * agent.accel[1]
+
+        # throttle action
+        speed = np.linalg.norm(agent.state.p_vel) + T * dt
+        if speed > agent.max_speed:
+            speed = agent.max_speed
+        elif speed < agent.min_speed:
+            speed = agent.min_speed
+
+        # turn action
+        w = np.sign(n) * 9.81 * np.sqrt(n**2 - 1) / speed
+        cos_heading = np.dot(agent.state.p_vel, self.north) / np.linalg.norm(agent.state.p_vel)
+        heading = np.sign(agent.state.p_vel[1]) * np.arccos(cos_heading) + w * dt
+        if heading > np.pi:
+            heading = heading - 2 * np.pi
+        elif heading < -np.pi:
+            heading = heading  + 2 * np.pi
+
+        # update velocity and position
+        agent.state.p_vel[0] = speed * np.cos(heading)
+        agent.state.p_vel[1] = speed * np.sin(heading)
+        agent.state.p_pos += agent.state.p_vel * dt
 
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
@@ -250,9 +291,10 @@ class Agent(Entity):
 
 # multi-agent world
 class World(object):
-    def __init__(self, is_dynamic=True):
+    def __init__(self, is_dynamic=True, position_scale=1.0):
         # determines if forces are used to update world state
         self.is_dynamic = is_dynamic
+        self.position_scale = position_scale
         # list of agents and entities (can change at execution-time!)
         self.agents = []
         self.landmarks = []
