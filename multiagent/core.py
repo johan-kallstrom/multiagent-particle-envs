@@ -75,7 +75,7 @@ class AccelerationAction(object):
             speed = agent.min_speed
 
         # turn action
-        w = np.sign(n) * 9.81 * np.sqrt(n**2 - 1) / speed
+        w = np.sign(n) * 9.81 * np.sqrt(n**2 - 1) / speed # turn rate
         cos_heading = np.dot(agent.state.p_vel, self.north) / np.linalg.norm(agent.state.p_vel)
         heading = np.sign(agent.state.p_vel[1]) * np.arccos(cos_heading) + w * dt
         if heading > np.pi:
@@ -90,40 +90,29 @@ class AccelerationAction(object):
 
 # action of the agent
 class PnGuidanceAction(object):
-    def __init__(self):
-        # physical action (acceleration)
-        self.u = None
+    def __init__(self,
+                 entity,
+                 target,
+                 dt,
+                 max_acc,
+                 N=3):
+        self.entity = entity
+        self.target = target
+        self.max_acc = max_acc
+        self.N = N
         self.north = np.array([1.0, 0.0])
-        # action space: Acceleration for speed and turn rate [min to max]
-        self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
+        self.tgt_last_pos = target.state.p_pos.copy()
+        self.tgt_last_los = target.state.p_pos - entity.state.p_pos
 
-    def set_action(self, action):
-        self.u = action
+    def update_entity_state(self, entity, dt):
+        if not entity.movable: return
+        
+        speed = np.linalg.norm(self.entity.state.p_vel)
 
-    def update_agent_state(self, agent, dt):
-        if not agent.movable: return
-        T = self.u[0] * agent.accel[0] # commanded thrust
-        if self.u[1] > 0:              # commanded load factor
-            n = 1.0 + self.u[1] * agent.accel[1]
-        else:
-            n = -1.0 + self.u[1] * agent.accel[1]
-
-        # throttle action
-        speed = np.linalg.norm(agent.state.p_vel) + T * dt
-        if speed > agent.max_speed:
-            speed = agent.max_speed
-        elif speed < agent.min_speed:
-            speed = agent.min_speed
-
-        # turn action
-        w = np.sign(n) * 9.81 * np.sqrt(n**2 - 1) / speed
-        cos_heading = np.dot(agent.state.p_vel, self.north) / np.linalg.norm(agent.state.p_vel)
-        heading = np.sign(agent.state.p_vel[1]) * np.arccos(cos_heading) + w * dt
-        if heading > np.pi:
-            heading = heading - 2 * np.pi
-        elif heading < -np.pi:
-            heading = heading  + 2 * np.pi
-
+        # a_n = N * lambda_dot * closing_speed
+        # lambda_dot = 
+        # closing_speed = np.linalg.norm((target.state.p_pos - entity.state.p_pos) / dt)
+ 
         # update velocity and position
         agent.state.p_vel[0] = speed * np.cos(heading)
         agent.state.p_vel[1] = speed * np.sin(heading)

@@ -8,7 +8,7 @@ class Scenario(BaseScenario):
         world.discrete_action_space = True
         world.dt = 1.0
         # add agents
-        world.agents = [Agent() for i in range(1)]
+        world.agents = [Agent() for i in range(4)]
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = False
