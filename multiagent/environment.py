@@ -291,7 +291,7 @@ class MultiAgentEnv(gym.Env):
                     print("Detecions for entity: ", entity.name, entity.sensor.detections)
             # render expendables
             for missile in self.world.missiles:
-                one_time_geom = self.viewers[i].draw_circle(radius=entity.size, res=30, filled=False)
+                one_time_geom = self.viewers[i].draw_circle(radius=missile.size, res=30, filled=False)
                 xform = rendering.Transform()
                 xform.set_translation(*(missile.state.p_pos / self.world.position_scale))
                 one_time_geom.add_attr(xform)

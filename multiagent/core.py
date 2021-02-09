@@ -32,7 +32,7 @@ class VelocityAction(object):
     def __init__(self):
         # physical action (speed and heading)
         self.u = None
-        # action space: Speed [min to max] and Heading [between -pi and pi]
+        # action space: Speed [min to max] and Heading relative north (y axis) [between -pi and pi]
         self.action_space = spaces.Box(low=np.array([0.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
 
     def set_action(self, action):
@@ -43,8 +43,8 @@ class VelocityAction(object):
         speed_delta = (agent.max_speed - agent.min_speed) / 2
         speed = agent.platform_action.u[0] * speed_delta + (agent.min_speed + speed_delta)
         heading = agent.platform_action.u[1] * np.pi
-        agent.state.p_vel[0] = speed * np.cos(heading)
-        agent.state.p_vel[1] = speed * np.sin(heading)
+        agent.state.p_vel[0] = speed * np.sin(heading)
+        agent.state.p_vel[1] = speed * np.cos(heading)
         agent.state.p_pos += agent.state.p_vel * dt     
 
 # action of the agent
@@ -52,8 +52,8 @@ class AccelerationAction(object):
     def __init__(self):
         # physical action (acceleration)
         self.u = None
-        self.north = np.array([1.0, 0.0])
-        # action space: Acceleration for speed and turn rate [min to max]
+        self.north = np.array([0.0, 1.0])
+        # action space: Acceleration for thrust and load factor [min to max]
         self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
 
     def set_action(self, action):
@@ -61,62 +61,84 @@ class AccelerationAction(object):
 
     def update_agent_state(self, agent, dt):
         if not agent.movable: return
-        T = self.u[0] * agent.accel[0] # commanded thrust
+        T = self.u[0] * agent.accel[0] # commanded thrust TODO: Remove symmetry forward/backward
         if self.u[1] > 0:              # commanded load factor
             n = 1.0 + self.u[1] * agent.accel[1]
         else:
             n = -1.0 + self.u[1] * agent.accel[1]
 
-        # throttle action
+        # effect of throttle action
         speed = np.linalg.norm(agent.state.p_vel) + T * dt
-        if speed > agent.max_speed:
-            speed = agent.max_speed
-        elif speed < agent.min_speed:
-            speed = agent.min_speed
+        speed = np.minimum(np.maximum(speed, agent.min_speed), agent.max_speed)
 
-        # turn action
+        # effect of turn action
         w = np.sign(n) * 9.81 * np.sqrt(n**2 - 1) / speed # turn rate
         cos_heading = np.dot(agent.state.p_vel, self.north) / np.linalg.norm(agent.state.p_vel)
-        heading = np.sign(agent.state.p_vel[1]) * np.arccos(cos_heading) + w * dt
+        heading = np.sign(agent.state.p_vel[0]) * np.arccos(cos_heading) + w * dt
         if heading > np.pi:
             heading = heading - 2 * np.pi
         elif heading < -np.pi:
             heading = heading  + 2 * np.pi
 
         # update velocity and position
-        agent.state.p_vel[0] = speed * np.cos(heading)
-        agent.state.p_vel[1] = speed * np.sin(heading)
+        agent.state.p_vel[0] = speed * np.sin(heading)
+        agent.state.p_vel[1] = speed * np.cos(heading)
         agent.state.p_pos += agent.state.p_vel * dt
 
-# action of the agent
+# action of the entity
 class PnGuidanceAction(object):
     def __init__(self,
                  entity,
                  target,
-                 dt,
                  max_acc,
-                 N=3):
+                 N=5):
         self.entity = entity
         self.target = target
         self.max_acc = max_acc
         self.N = N
-        self.north = np.array([1.0, 0.0])
-        self.tgt_last_pos = target.state.p_pos.copy()
+        self.north = np.array([0.0, 1.0])      
         self.tgt_last_los = target.state.p_pos - entity.state.p_pos
 
     def update_entity_state(self, entity, dt):
-        if not entity.movable: return
+        # if not entity.movable: return
         
-        speed = np.linalg.norm(self.entity.state.p_vel)
+        cur_speed = np.linalg.norm(entity.state.p_vel)
+        tgt_cur_los = self.target.state.p_pos - entity.state.p_pos
 
-        # a_n = N * lambda_dot * closing_speed
-        # lambda_dot = 
-        # closing_speed = np.linalg.norm((target.state.p_pos - entity.state.p_pos) / dt)
- 
+        # check line-of-sight rotation relative north
+        cos_lambda_last = np.dot(self.tgt_last_los, self.north) / np.linalg.norm(self.tgt_last_los)
+        lambda_last = np.sign(self.tgt_last_los[0]) * np.arccos(cos_lambda_last)
+        cos_lambda_cur = np.dot(tgt_cur_los, self.north) / np.linalg.norm(tgt_cur_los)
+        lambda_cur = np.sign(tgt_cur_los[0]) * np.arccos(cos_lambda_cur)
+
+        lambda_delta = lambda_cur - lambda_last
+        if lambda_delta > np.pi:
+            lambda_delta = lambda_delta - 2 * np.pi
+        elif lambda_delta < -np.pi:
+            lambda_delta = lambda_delta  + 2 * np.pi
+
+        lambda_dot = lambda_delta / dt
+
+        # check closing speed
+        Vc = (np.linalg.norm(tgt_cur_los) - np.linalg.norm(self.tgt_last_los)) / dt
+        speed_c = np.linalg.norm(Vc)
+
+        # calculate acceleration normal to current velocity
+        a_n = np.minimum(self.N * lambda_dot * speed_c, self.max_acc)
+
+        # rotate acceleration vector ([a_n, 0] for heading = 0) based on current heading
+        cos_heading = np.dot(entity.state.p_vel, self.north) / np.linalg.norm(entity.state.p_vel)
+        heading = np.sign(entity.state.p_vel[0]) * np.arccos(cos_heading)
+
+        a_n_rot = np.array([a_n * np.cos(-heading), a_n * np.sin(-heading)])
+
         # update velocity and position
-        agent.state.p_vel[0] = speed * np.cos(heading)
-        agent.state.p_vel[1] = speed * np.sin(heading)
-        agent.state.p_pos += agent.state.p_vel * dt
+        entity.state.p_vel += a_n_rot * dt
+        entity.state.p_vel = entity.state.p_vel / np.linalg.norm(entity.state.p_vel) * cur_speed # keep speed constant
+        entity.state.p_pos += entity.state.p_vel * dt
+
+        # store values for next update
+        self.tgt_last_los = tgt_cur_los
 
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
@@ -228,24 +250,25 @@ class Landmark(Entity):
 # properties of missile entities,
 # scenario should define sensor and its proprties
 class Missile(Entity):
-    def __init__(self, target):
+    def __init__(self, target, init_pos, init_vel, world):
         super(Missile, self).__init__()
         self.target = target
-        self.lethal_range = self.size
+        self.lethal_range = self.size * world.position_scale
         self.color = np.array([0.25,0.25,0.25])
         self.onetime_render = True
-        self.size = 0.5 * self.size
+        self.size = 0.25 * self.size
         self.destroyed = False
-        self.state.p_pos = np.array([0.0, 0.0])
+        self.state.p_pos = init_pos
+        self.state.p_vel = 2 * init_vel # TODO: COnfigure speed
+        self.guidance = PnGuidanceAction(self,
+                                         target,
+                                         max_acc=9*9.82)
 
     def update_state(self, world):
-        speed = 2.0 * 0.005 #self.target.max_speed
+        self.guidance.update_entity_state(self, world.dt)
         m_to_tgt = self.target.state.p_pos - self.state.p_pos
         if np.linalg.norm(m_to_tgt) < self.lethal_range:
             self.destroyed = True
-            return
-        direction = (1/np.linalg.norm(m_to_tgt)) * m_to_tgt
-        self.state.p_pos += speed * direction * world.dt
 
 # properties of agent entities
 class Agent(Entity):
@@ -265,6 +288,7 @@ class Agent(Entity):
         self.u_range = 1.0
         # state
         self.state = AgentState()
+        self.missiles = 6
         # actions
         # ------------------------------------------------------------------------------------------
         self.action = Action()          # standard particle envs force and communication actions
@@ -356,8 +380,10 @@ class World(object):
         # for agent in self.agents:
         #     if agent.sensor is not None:
         #         for detection in agent.sensor.detections:
-        #             missile = Missile(detection)
+        #             if agent.missiles < 1: continue
+        #             missile = Missile(detection, init_pos=agent.state.p_pos.copy(), init_vel=agent.state.p_vel.copy(), world=self)
         #             self.missiles.append(missile)
+        #             agent.missiles -= 1
         # update states of expendables
         self.missiles = self.update_missile_states()
         # update world steps
