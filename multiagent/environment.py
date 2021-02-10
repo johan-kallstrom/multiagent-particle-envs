@@ -289,15 +289,15 @@ class MultiAgentEnv(gym.Env):
                     else:
                         self.sensor_render_geoms[e].set_color(*entity.color, alpha=0.2)
                     print("Detecions for entity: ", entity.name, entity.sensor.detections)
-            # render expendables
-            for missile in self.world.missiles:
-                one_time_geom = self.viewers[i].draw_circle(radius=missile.size, res=30, filled=False)
-                xform = rendering.Transform()
-                xform.set_translation(*(missile.state.p_pos / self.world.position_scale))
-                one_time_geom.add_attr(xform)
-                one_time_geom.set_color(*missile.color)
-                one_time_geom.set_linewidth(5.0)
-            # render to display or array
+                # render expendables
+                for missile in entity.state.missiles_in_flight:
+                    one_time_geom = self.viewers[i].draw_circle(radius=missile.size, res=30, filled=False)
+                    xform = rendering.Transform()
+                    xform.set_translation(*(missile.state.p_pos / self.world.position_scale))
+                    one_time_geom.add_attr(xform)
+                    one_time_geom.set_color(*missile.color)
+                    one_time_geom.set_linewidth(5.0)
+                # render to display or array
             results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
         return results
@@ -338,15 +338,18 @@ class ACMultiAgentEnv(MultiAgentEnv):
                                               observation_callback=observation_callback, info_callback=info_callback,
                                               done_callback=done_callback, shared_viewer=shared_viewer)
         # let each scenario define its own action space
-        self.action_space = []
+        self.platform_action_space = []
+        self.fire_action_space = []
         for agent in self.agents:
-            self.action_space.append(agent.platform_action.action_space)
+            self.platform_action_space.append(agent.platform_action.action_space)
+            self.fire_action_space.append(agent.fire_action.action_space)
 
     # set env action for a particular agent
     def _set_action(self, action, agent, action_space, time=None):
         # let each scenario define how to set actions
         # agent.platform_action.set_action(action["platform_action"])
-        agent.platform_action.set_action(action)
+        agent.platform_action.set_action(action[0])
+        agent.fire_action.set_action(action[1])
 
 # vectorized wrapper for a batch of multi-agent environments
 # assumes all environments have the same observation and action space

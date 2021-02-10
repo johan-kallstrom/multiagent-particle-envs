@@ -1,5 +1,5 @@
 import numpy as np
-from multiagent.core import World, Agent, AccelerationAction, Landmark, Sensor, Rwr
+from multiagent.core import World, Agent, AccelerationAction, FireAction, Landmark, Sensor, Rwr
 from multiagent.scenario import BaseScenario
 
 class Scenario(BaseScenario):
@@ -8,12 +8,13 @@ class Scenario(BaseScenario):
         world.discrete_action_space = True
         world.dt = 1.0
         # add agents
-        world.agents = [Agent() for i in range(8)]
+        world.agents = [Agent() for i in range(2)]
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.silent = True
             agent.platform_action = AccelerationAction()
+            agent.fire_action = FireAction(2)
             agent.max_speed = 700.0
             agent.min_speed = 0.25 * agent.max_speed
             agent.accel = [1.0*9.81, 8]
@@ -33,7 +34,6 @@ class Scenario(BaseScenario):
         # random properties for agents
         for i, agent in enumerate(world.agents):
             agent.color = np.array([0.25,0.25,0.25])
-            agent.missiles = 6
         # random properties for landmarks
         for i, landmark in enumerate(world.landmarks):
             landmark.color = np.array([0.75,0.75,0.75])
@@ -43,11 +43,11 @@ class Scenario(BaseScenario):
             agent.state.p_pos = np.random.uniform(-1*world.position_scale ,+1*world.position_scale , world.dim_p)
             agent.state.p_vel = np.ones(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
+            agent.state.missiles = agent.state.missiles_loaded
+            agent.state.missiles_in_flight = []
         for i, landmark in enumerate(world.landmarks):
             landmark.state.p_pos = np.random.uniform(-1*world.position_scale,+1*world.position_scale, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
-        # reset missiles
-        world.missiles = []
         # reset steps
         world.steps = 0
 
