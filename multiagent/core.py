@@ -11,6 +11,8 @@ class EntityState(object):
         self.p_vel = None
         # indication of being observed
         self.observed = False
+        # missiles in flight
+        self.missiles_in_flight = []
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
@@ -38,7 +40,7 @@ class VelocityAction(object):
     def set_action(self, action):
         self.u = action
 
-    def update_agent_state(self, agent, dt):
+    def update_entity_state(self, agent, dt):
         if not agent.movable: return
         speed_delta = (agent.max_speed - agent.min_speed) / 2
         speed = agent.platform_action.u[0] * speed_delta + (agent.min_speed + speed_delta)
@@ -59,7 +61,7 @@ class AccelerationAction(object):
     def set_action(self, action):
         self.u = action
 
-    def update_agent_state(self, agent, dt):
+    def update_entity_state(self, agent, dt):
         if not agent.movable: return
         T = self.u[0] * agent.accel[0] # commanded thrust TODO: Remove symmetry forward/backward
         if self.u[1] > 0:              # commanded load factor
@@ -144,14 +146,34 @@ class PnGuidanceAction(object):
 
 # action of the agent
 class FireAction(object):
-    def __init__(self):
+    def __init__(self, loaded_missiles):
         # fire action (fire (1) or not (0))
         self.u = None
         # action space
         self.action_space = spaces.Discrete(2)
+        # state
+        self.loaded_missiles = loaded_missiles
+        self.missiles_in_flight = []
 
     def set_action(self, action):
         self.u = action
+
+    def update_entity_state(self, entity, world):
+        if entity.missiles > 0 and self.u == 1:
+            pass # fire missile
+        live_missiles = []
+        for missile in entity.state.missiles_in_flight:
+            missile.update_state(world)
+            if not missile.destroyed:
+                live_missiles.append(missile)
+        entity.state.missiles_in_flight = live_missiles
+
+
+        #             if agent.missiles < 1: continue
+        #             missile = Missile(detection, init_pos=agent.state.p_pos.copy(), init_vel=agent.state.p_vel.copy(), world=self)
+        #             self.missiles.append(missile)
+        #             agent.missiles -= 1
+
 
 # sensor object for agents wit limited vision
 class Sensor(object):
@@ -248,7 +270,7 @@ class Landmark(Entity):
         super(Landmark, self).__init__()
 
 # properties of missile entities,
-# scenario should define sensor and its proprties
+# scenario should define sensor and its properties
 class Missile(Entity):
     def __init__(self, target, init_pos, init_vel, world):
         super(Missile, self).__init__()
@@ -360,7 +382,7 @@ class World(object):
         else:
             # update agents' physical states based on commanded action
             for agent in self.agents:
-                agent.platform_action.update_agent_state(agent, self.dt)
+                agent.platform_action.update_entity_state(agent, self.dt)
             # self.integrate_state_from_vel_action()
         # update agent state
         for agent in self.agents:
