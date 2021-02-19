@@ -52,8 +52,7 @@ class Scenario(BaseScenario):
         world.steps = 0
 
     def reward(self, agent, world):
-        dist2 = np.sum(np.square(agent.state.p_pos - world.landmarks[0].state.p_pos)) / (2*world.position_scale)
-        # print(dist2)
+        dist2 = np.sqrt(np.sum(np.square(agent.state.p_pos - world.landmarks[0].state.p_pos))) / (world.position_scale)
         return -dist2
 
     def observation(self, agent, world):
