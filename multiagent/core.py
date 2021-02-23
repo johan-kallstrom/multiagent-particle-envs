@@ -320,6 +320,10 @@ class Agent(Entity):
         self.ew_action = None           # Tuple action space: Action for EW control
         self.fire_action = None         # Tuple action space: Action for weapon fire control
         # ------------------------------------------------------------------------------------------
+        # situational awareness
+        # ------------------------------------------------------------------------------------------
+        self.fusioned_sa = None
+        # ------------------------------------------------------------------------------------------
         # script behavior to execute
         self.action_callback = None
 

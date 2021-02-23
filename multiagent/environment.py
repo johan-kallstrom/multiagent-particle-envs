@@ -337,6 +337,10 @@ class ACMultiAgentEnv(MultiAgentEnv):
         super(ACMultiAgentEnv, self).__init__(world=world, reset_callback=reset_callback, reward_callback=reward_callback,
                                               observation_callback=observation_callback, info_callback=info_callback,
                                               done_callback=done_callback, shared_viewer=shared_viewer)
+        # let each agent define its own observation space
+        self.observation_space = []
+        for agent in self.agents:
+            self.observation_space.append(agent.fusioned_sa.observation_space)
         # let each scenario define its own action space
         self.platform_action_space = []
         self.fire_action_space = []
@@ -350,6 +354,10 @@ class ACMultiAgentEnv(MultiAgentEnv):
         # agent.platform_action.set_action(action["platform_action"])
         agent.platform_action.set_action(action[0])
         agent.fire_action.set_action(action[1])
+
+    # get observation for a particular agent
+    def _get_obs(self, agent):
+        return agent.fusioned_sa.observation(agent, self.world)
 
 # vectorized wrapper for a batch of multi-agent environments
 # assumes all environments have the same observation and action space
