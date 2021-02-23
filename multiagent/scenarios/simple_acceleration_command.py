@@ -8,15 +8,30 @@ class LandMarkObservation:
 
     def __init__(self, n_landmarks, agent, world):
         self.n_landmarks = n_landmarks
-        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2 + 2,), dtype=np.float32)
 
     def observation(self, agent, world):
-        entity_pos = np.zeros(shape=(self.n_landmarks*2,))
-        for i, detection in enumerate(agent.sensor.detections):
-            pos = ((detection.state.p_pos - agent.state.p_pos) / (world.position_scale))
-            entity_pos[i*2] = pos[0]
-            entity_pos[i*2+1] = pos[1]
-        return entity_pos
+        obs = np.zeros(shape=(self.n_landmarks*2 + 2,))
+        for i, entity in enumerate(world.landmarks):
+            entity_pos = ((entity.state.p_pos - agent.state.p_pos) / (world.position_scale))
+            obs[i*2] = entity_pos[0]
+            obs[i*2+1] = entity_pos[1]
+        vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
+        obs[-2] = vel_norm[0]
+        obs[-1] = vel_norm[1]
+        # print(obs)
+        return obs
+
+    # def observation(self, agent, world):
+    #     obs = np.zeros(shape=(self.n_landmarks*2 + 2,))
+    #     for i, detection in enumerate(agent.sensor.detections):
+    #         entity_pos = ((detection.state.p_pos - agent.state.p_pos) / (world.position_scale))
+    #         obs[i*2] = entity_pos[0]
+    #         obs[i*2+1] = entity_pos[1]
+    #     vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
+    #     obs[-2] = vel_norm[0]
+    #     obs[-1] = vel_norm[1]
+    #     return obs
 
 class Scenario(BaseScenario):
     def make_world(self):
@@ -70,9 +85,13 @@ class Scenario(BaseScenario):
         world.steps = 0
 
     def reward(self, agent, world):
-        rew = -0.1
-        if len(agent.sensor.detections) > 0:
-            rew += 10
+        rew = 0.0
+        # rew = -0.1
+        # if len(agent.sensor.detections) > 0:
+        #     rew += 10
+        for l in world.landmarks:
+            dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos)))/(10*world.position_scale) for a in world.agents]
+            rew -= min(dists)
         return rew
 
     def observation(self, agent, world):
@@ -83,4 +102,5 @@ class Scenario(BaseScenario):
         return np.concatenate([agent.state.p_vel] + entity_pos)
 
     def done(self, agent, world):
-        return (len(agent.sensor.detections)) or (world.steps > 300)
+        # return (len(agent.sensor.detections)) or (world.steps > 300)
+        return (world.steps > 300)
