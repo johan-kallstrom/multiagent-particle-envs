@@ -51,6 +51,7 @@ class Scenario(BaseScenario):
             agent.max_speed = 700.0
             agent.min_speed = 0.25 * agent.max_speed
             agent.accel = [1.0*9.81, 8]
+            # agent.accel = [1.0, 0.8]
             agent.sensor = Sensor([2 * np.pi / 3], [100000.0], [2.5e-5])
         # add landmarks
         world.landmarks = [Landmark() for i in range(n_landmarks)]
@@ -74,7 +75,8 @@ class Scenario(BaseScenario):
         # set random initial states
         for agent in world.agents:
             agent.state.p_pos = np.random.uniform(-1*world.position_scale ,+1*world.position_scale , world.dim_p)
-            agent.state.p_vel = np.ones(world.dim_p)
+            # agent.state.p_vel = 700*np.ones(world.dim_p)
+            agent.state.p_vel = agent.max_speed * np.random.uniform(-1 ,+1 , world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
             agent.state.missiles = agent.state.missiles_loaded
             agent.state.missiles_in_flight = []
