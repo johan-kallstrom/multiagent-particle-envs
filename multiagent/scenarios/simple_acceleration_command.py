@@ -8,17 +8,19 @@ class LandMarkObservation:
 
     def __init__(self, n_landmarks, agent, world):
         self.n_landmarks = n_landmarks
-        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2 + 2,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2 + 2 + 2,), dtype=np.float32)
 
     def observation(self, agent, world):
-        obs = np.zeros(shape=(self.n_landmarks*2 + 2,))
+        obs = np.zeros(shape=(self.n_landmarks*2 + 2 + 2,))
         for i, entity in enumerate(world.landmarks):
             entity_pos = ((entity.state.p_pos - agent.state.p_pos) / (world.position_scale))
             obs[i*2] = entity_pos[0]
             obs[i*2+1] = entity_pos[1]
         vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
-        obs[-2] = vel_norm[0]
-        obs[-1] = vel_norm[1]
+        obs[-4] = vel_norm[0]
+        obs[-3] = vel_norm[1]
+        obs[-2] = agent.platform_action.u[0]
+        obs[-1] = agent.platform_action.u[1]
         # print(obs)
         return obs
 
