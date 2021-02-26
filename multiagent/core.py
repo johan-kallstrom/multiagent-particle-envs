@@ -58,7 +58,7 @@ class VelocityAction(object):
 class AccelerationAction(object):
     def __init__(self):
         # physical action (acceleration)
-        self.u = None
+        self.u = np.array([0.0, 0.0])
         self.north = np.array([0.0, 1.0])
         # action space: Acceleration for thrust and load factor [min to max]
         self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
