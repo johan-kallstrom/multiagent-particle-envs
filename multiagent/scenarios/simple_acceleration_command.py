@@ -8,19 +8,21 @@ class LandMarkObservation:
 
     def __init__(self, n_landmarks, agent, world):
         self.n_landmarks = n_landmarks
-        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2 + 2 + 2,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2 + 2,), dtype=np.float32)
 
     def observation(self, agent, world):
-        obs = np.zeros(shape=(self.n_landmarks*2 + 2 + 2,))
+        obs = np.zeros(shape=(self.n_landmarks*2 + 2,))
         for i, entity in enumerate(world.landmarks):
             entity_pos = ((entity.state.p_pos - agent.state.p_pos) / (world.position_scale))
             obs[i*2] = entity_pos[0]
             obs[i*2+1] = entity_pos[1]
         vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
-        obs[-4] = vel_norm[0]
-        obs[-3] = vel_norm[1]
-        obs[-2] = agent.platform_action.u[0]
-        obs[-1] = agent.platform_action.u[1]
+        # acc_norm = agent.platform_action.u / np.linalg.norm(agent.platform_action.u + 0.0000001)
+        obs[-2] = vel_norm[0]
+        obs[-1] = vel_norm[1]
+        # obs[-2] = acc_norm[0]
+        # obs[-1] = acc_norm[1]
+
         # print(obs)
         return obs
 
@@ -37,7 +39,7 @@ class LandMarkObservation:
 
 class Scenario(BaseScenario):
     def make_world(self):
-        world = World(is_dynamic=False, position_scale=200000.0)
+        world = World(is_dynamic=False, position_scale=50000.0)
         world.discrete_action_space = True
         world.dt = 1.0
         n_landmarks = 1
@@ -50,9 +52,9 @@ class Scenario(BaseScenario):
             agent.fusioned_sa = LandMarkObservation(n_landmarks, agent, world)
             agent.platform_action = AccelerationAction()
             agent.fire_action = FireAction(2)
-            agent.max_speed = 700.0
-            agent.min_speed = 0.25 * agent.max_speed
-            agent.accel = [1.0*9.81, 8]
+            agent.max_speed = 350.0 # 700.0
+            agent.min_speed = 0.8 * agent.max_speed
+            agent.accel = [1.0*9.81, 2] # [1.0*9.81, 8]
             # agent.accel = [1.0, 0.8]
             agent.sensor = Sensor([2 * np.pi / 3], [100000.0], [2.5e-5])
         # add landmarks
@@ -94,8 +96,10 @@ class Scenario(BaseScenario):
         # if len(agent.sensor.detections) > 0:
         #     rew += 10
         for l in world.landmarks:
-            dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos)))/(10*world.position_scale) for a in world.agents]
+            dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos)))/(world.position_scale) for a in world.agents]
+            # dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos))) for a in world.agents]
             rew -= min(dists)
+        # print(rew)
         return rew
 
     def observation(self, agent, world):
@@ -107,4 +111,4 @@ class Scenario(BaseScenario):
 
     def done(self, agent, world):
         # return (len(agent.sensor.detections)) or (world.steps > 300)
-        return (world.steps > 300)
+        return (world.steps > 200)
