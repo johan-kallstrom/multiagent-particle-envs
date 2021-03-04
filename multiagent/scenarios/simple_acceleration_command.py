@@ -16,26 +16,12 @@ class LandMarkObservation:
             entity_pos = ((entity.state.p_pos - agent.state.p_pos) / (world.position_scale))
             obs[i*2] = entity_pos[0]
             obs[i*2+1] = entity_pos[1]
-        vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
-        # acc_norm = agent.platform_action.u / np.linalg.norm(agent.platform_action.u + 0.0000001)
+        # vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
+        vel_norm = agent.state.p_vel / 350.0
         obs[-2] = vel_norm[0]
         obs[-1] = vel_norm[1]
-        # obs[-2] = acc_norm[0]
-        # obs[-1] = acc_norm[1]
-
-        # print(obs)
+        
         return obs
-
-    # def observation(self, agent, world):
-    #     obs = np.zeros(shape=(self.n_landmarks*2 + 2,))
-    #     for i, detection in enumerate(agent.sensor.detections):
-    #         entity_pos = ((detection.state.p_pos - agent.state.p_pos) / (world.position_scale))
-    #         obs[i*2] = entity_pos[0]
-    #         obs[i*2+1] = entity_pos[1]
-    #     vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
-    #     obs[-2] = vel_norm[0]
-    #     obs[-1] = vel_norm[1]
-    #     return obs
 
 class Scenario(BaseScenario):
     def make_world(self):
@@ -54,8 +40,7 @@ class Scenario(BaseScenario):
             agent.fire_action = FireAction(2)
             agent.max_speed = 350.0 # 700.0
             agent.min_speed = 0.8 * agent.max_speed
-            agent.accel = [1.0*9.81, 2] # [1.0*9.81, 8]
-            # agent.accel = [1.0, 0.8]
+            agent.accel = [1.0*9.81, 8.0]
             agent.sensor = Sensor([2 * np.pi / 3], [100000.0], [2.5e-5])
         # add landmarks
         world.landmarks = [Landmark() for i in range(n_landmarks)]
