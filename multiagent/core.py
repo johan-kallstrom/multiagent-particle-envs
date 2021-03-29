@@ -155,6 +155,7 @@ class HeadingAction(object):
                  max_acc,
                  N=5):
         self.u = None
+        self.target_dist = 100000.0
         self.north = np.array([0.0, 1.0])
 
         # setup PN guidance
@@ -166,10 +167,14 @@ class HeadingAction(object):
                                             N)
 
     def set_action(self, action):
-        self.u = action # desired heading [-1.0, 1.0]
+        self.u = 2 * np.pi * action # desired heading relative north 2 * pi * [0.0, 1.0]
         
     def update_entity_state(self, entity, world):
-        pass
+        target = None
+        delta_x = np.sin(self.u) * self.target_dist
+        delta_y = np.cos(self.u) * self.target_dist
+        self.pn_guidance.target = self.pn_guidance.target
+        self.pn_guidance.update_entity_state(entity, world)
 
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
