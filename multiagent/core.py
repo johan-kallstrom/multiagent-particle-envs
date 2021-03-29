@@ -149,6 +149,28 @@ class PnGuidanceAction(object):
         # store values for next update
         self.tgt_last_los = tgt_cur_los
 
+# heading command
+class HeadingAction(object):
+    def __init__(self,
+                 max_acc,
+                 N=5):
+        self.u = None
+        self.north = np.array([0.0, 1.0])
+
+        # setup PN guidance
+        entity = None
+        target = None
+        self.pn_guidance = PnGuidanceAction(entity,
+                                            target,
+                                            max_acc,
+                                            N)
+
+    def set_action(self, action):
+        self.u = action # desired heading [-1.0, 1.0]
+        
+    def update_entity_state(self, entity, world):
+        pass
+
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
 # action of the agent
