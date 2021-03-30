@@ -54,7 +54,7 @@ class VelocityAction(object):
         agent.state.p_vel[1] = speed * np.cos(heading)
         agent.state.p_pos += agent.state.p_vel * dt     
 
-# action of the agent
+# thrust and turn acceleration command
 class AccelerationAction(object):
     def __init__(self):
         # physical action (acceleration)
@@ -93,14 +93,41 @@ class AccelerationAction(object):
         agent.state.p_vel[1] = speed * np.cos(heading)
         agent.state.p_pos += agent.state.p_vel * dt
 
-# action of the entity
+# thrust and heading command
+class HeadingAction(object):
+    def __init__(self,
+                 max_acc,
+                 N=3):
+        self.u = None
+        self.target_dist = 100000.0
+        self.north = np.array([0.0, 1.0])
+        # action space: Command thrust [min to max] and heading [-pi and +pi]
+        self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
+
+        # use acceleration action for control
+        self.acc_action = AccelerationAction()
+
+    def set_action(self, action):
+        self.u = action
+
+        
+    def update_entity_state(self, agent, world):
+        dt = world.dt
+        T = self.u[0] * agent.accel[0] # commanded thrust
+
+        # set turn agent based on deviation from desired heading
+        tgt_heading = action[1]
+        turn_action = None
+
+        self.acc_action.set_action(np.array([action[0], turn_action]))
+
+# missile PN guidance
 class PnGuidanceAction(object):
     def __init__(self,
                  entity,
                  target,
                  max_acc,
                  N=5):
-        self.entity = entity
         self.target = target
         self.max_acc = max_acc
         self.N = N
@@ -148,33 +175,6 @@ class PnGuidanceAction(object):
 
         # store values for next update
         self.tgt_last_los = tgt_cur_los
-
-# heading command
-class HeadingAction(object):
-    def __init__(self,
-                 max_acc,
-                 N=5):
-        self.u = None
-        self.target_dist = 100000.0
-        self.north = np.array([0.0, 1.0])
-
-        # setup PN guidance
-        entity = None
-        target = None
-        self.pn_guidance = PnGuidanceAction(entity,
-                                            target,
-                                            max_acc,
-                                            N)
-
-    def set_action(self, action):
-        self.u = 2 * np.pi * action # desired heading relative north 2 * pi * [0.0, 1.0]
-        
-    def update_entity_state(self, entity, world):
-        target = None
-        delta_x = np.sin(self.u) * self.target_dist
-        delta_y = np.cos(self.u) * self.target_dist
-        self.pn_guidance.target = self.pn_guidance.target
-        self.pn_guidance.update_entity_state(entity, world)
 
 # TODO: Weapon, Sensor and Electronic Warfare control actions
 
