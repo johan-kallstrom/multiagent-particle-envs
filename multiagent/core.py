@@ -95,9 +95,7 @@ class AccelerationAction(object):
 
 # thrust and heading command
 class HeadingAction(object):
-    def __init__(self,
-                 max_acc,
-                 N=3):
+    def __init__(self):
         self.u = None
         self.target_dist = 100000.0
         self.north = np.array([0.0, 1.0])
@@ -105,29 +103,28 @@ class HeadingAction(object):
         self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
 
         # use acceleration action for control
+        self.Kp = 1 / np.pi
         self.acc_action = AccelerationAction()
 
     def set_action(self, action):
         self.u = action
-
         
     def update_entity_state(self, agent, world):
         # set turn agent based on deviation from desired heading
-        tgt_heading = action[1]
+        tgt_heading = self.u[1] * np.pi
         tgt_vector = np.array([np.sin(tgt_heading), np.cos(tgt_heading)], dtype=np.float32) # unit vector
-        vel_vector = agent.state.p_vel
 
         # angle error according to dot product between tgt direction and current direction
-        cos_angle_error = np.dot(tgt_vector, agent.state.p_vel) / np.linalg.norm(agent.state.p_vel)
+        cos_angle_error = np.dot(tgt_vector, agent.state.p_vel) / (np.linalg.norm(tgt_vector) + np.linalg.norm(agent.state.p_vel))
         angle_error = np.arccos(cos_angle_error)
 
         # turn direction according to determinant between target direction and current direction
-        turn_direction = tgt_vector[0] * agent.state.p_vel[1] - tgt_vector[1] * agent.state.p_vel[0]
+        turn_direction = np.sign(tgt_vector[0] * agent.state.p_vel[1] - tgt_vector[1] * agent.state.p_vel[0])
 
-        # calculate turn action using PID controller
+        # calculate turn action using P controller
         turn_action = self.Kp * turn_direction * angle_error
 
-        self.acc_action.set_action(np.array([action[0], turn_action]))
+        self.acc_action.set_action(np.array([self.u[0], turn_action]))
         self.acc_action.update_entity_state(agent, world)
 
 # missile PN guidance
