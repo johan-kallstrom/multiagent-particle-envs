@@ -112,14 +112,23 @@ class HeadingAction(object):
 
         
     def update_entity_state(self, agent, world):
-        dt = world.dt
-        T = self.u[0] * agent.accel[0] # commanded thrust
-
         # set turn agent based on deviation from desired heading
         tgt_heading = action[1]
-        turn_action = None
+        tgt_vector = np.array([np.sin(tgt_heading), np.cos(tgt_heading)], dtype=np.float32) # unit vector
+        vel_vector = agent.state.p_vel
+
+        # angle error according to dot product between tgt direction and current direction
+        cos_angle_error = np.dot(tgt_vector, agent.state.p_vel) / np.linalg.norm(agent.state.p_vel)
+        angle_error = np.arccos(cos_angle_error)
+
+        # turn direction according to determinant between target direction and current direction
+        turn_direction = tgt_vector[0] * agent.state.p_vel[1] - tgt_vector[1] * agent.state.p_vel[0]
+
+        # calculate turn action using PID controller
+        turn_action = self.Kp * turn_direction * angle_error
 
         self.acc_action.set_action(np.array([action[0], turn_action]))
+        self.acc_action.update_entity_state(agent, world)
 
 # missile PN guidance
 class PnGuidanceAction(object):
