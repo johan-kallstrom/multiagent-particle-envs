@@ -98,7 +98,6 @@ class HeadingAction(object):
     def __init__(self):
         self.u = None
         self.target_dist = 100000.0
-        self.north = np.array([0.0, 1.0])
         # action space: Command thrust [min to max] and heading [-pi and +pi]
         self.action_space = spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
 
@@ -123,9 +122,44 @@ class HeadingAction(object):
 
         # calculate turn action using P controller
         turn_action = self.Kp * turn_direction * angle_error
+        turn_action = np.minimum(np.maximum(turn_action, -1), 1)
 
         self.acc_action.set_action(np.array([self.u[0], turn_action]))
         self.acc_action.update_entity_state(agent, world)
+
+# thrust and heading command
+class RouteAction(object):
+    def __init__(self,
+                 route,
+                 wp_reached_distance=1000.0):
+        self.route = route
+        self.wp_reached_distance = wp_reached_distance
+        self.current_wp = 0
+        self.u = None
+        self.north = np.array([0.0, 1.0])
+        # action space: Command thrust [min to max] while following route
+        self.action_space = spaces.Box(low=np.array([-1.0]), high=np.array([1.0]), dtype=np.float32)
+
+        # use heading action for control
+        self.heading_action = HeadingAction()
+
+    def set_action(self, action):
+        self.u = action
+        
+    def update_entity_state(self, agent, world):
+        # get heading to wp from agent's position
+        wp_vector = self.route[self.current_wp].state.p_pos - agent.state.p_pos
+        cos_heading = np.dot(wp_vector, self.north) / np.linalg.norm(wp_vector)
+        heading = np.sign(wp_vector[0]) * np.arccos(cos_heading) / np.pi
+
+        # update state using heading action
+        self.heading_action.set_action(np.array([self.u[0], heading]))
+        self.heading_action.update_entity_state(agent, world)
+
+        # check if wp was reached
+        dist = np.linalg.norm(self.route[self.current_wp].state.p_pos - agent.state.p_pos)
+        if dist < self.wp_reached_distance:
+            self.current_wp = (self.current_wp + 1) % len(self.route)
 
 # missile PN guidance
 class PnGuidanceAction(object):
