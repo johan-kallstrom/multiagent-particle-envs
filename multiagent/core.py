@@ -161,6 +161,43 @@ class RouteAction(object):
         if dist < self.wp_reached_distance:
             self.current_wp = (self.current_wp + 1) % len(self.route)
 
+# thrust and unit geometry command
+class RelativeTargetAction(object):
+    def __init__(self,
+                 n_units,
+                 ):
+        self.u = None
+        self.north = np.array([0.0, 1.0])
+        # action space: Command thrust [min to max] and aspect angle [-pi to pi] relative specified target
+        self.action_space = spaces.Box(low=np.array([-1.0]), high=np.array([1.0]), dtype=np.float32)
+        self.action_space = spaces.Tuple((spaces.Box(low=np.array([-1.0, -1.0]), high=np.array([1.0, 1.0]), dtype=np.float32), 
+                                          spaces.Discrete(n_units)))
+
+        # use heading action for control
+        self.heading_action = HeadingAction()
+
+    def set_action(self, action):
+        self.u = action
+        
+    def update_entity_state(self, agent, world):
+        # get heading to target from agent's position
+        target = world.entities[self.u[1]]
+        tgt_vector = target.state.p_pos - agent.state.p_pos
+        cos_tgt_heading = np.dot(tgt_vector, self.north) / np.linalg.norm(tgt_vector)
+        tgt_heading = np.sign(tgt_vector[0]) * np.arccos(cos_tgt_heading)
+
+        # calculate desired heading relative north
+        heading = tgt_heading + self.u[0][1] * np.pi
+        if heading < -np.pi:
+            heading += 2 * np.pi
+        if heading > np.pi:
+            heading -= 2 * np.pi
+        heading =  heading / np.pi
+
+        # update state using heading action
+        self.heading_action.set_action(np.array([self.u[0][0], heading]))
+        self.heading_action.update_entity_state(agent, world)
+
 # missile PN guidance
 class PnGuidanceAction(object):
     def __init__(self,
