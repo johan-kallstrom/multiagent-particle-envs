@@ -127,7 +127,7 @@ class HeadingAction(object):
         self.acc_action.set_action(np.array([self.u[0], turn_action]))
         self.acc_action.update_entity_state(agent, world)
 
-# thrust and heading command
+# route thrust command
 class RouteAction(object):
     def __init__(self,
                  route,
