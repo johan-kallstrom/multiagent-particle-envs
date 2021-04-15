@@ -93,7 +93,6 @@ class MultiAgentEnv(gym.Env):
             obs_n.append(self._get_obs(agent))
             reward_n.append(self._get_reward(agent))
             done_n.append(self._get_done(agent))
-
             info_n['n'].append(self._get_info(agent))
 
         # all agents get total reward in cooperative case
@@ -344,9 +343,11 @@ class ACMultiAgentEnv(MultiAgentEnv):
         # let each scenario define its own action space
         self.platform_action_space = []
         self.fire_action_space = []
+        self.action_space = []
         for agent in self.agents:
             self.platform_action_space.append(agent.platform_action.action_space)
             self.fire_action_space.append(agent.fire_action.action_space)
+            self.action_space.append(spaces.Discrete(2))
 
     # set env action for a particular agent
     def _set_action(self, action, agent, action_space, time=None):

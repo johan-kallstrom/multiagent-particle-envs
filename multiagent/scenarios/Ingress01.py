@@ -4,38 +4,40 @@ from multiagent.scenario import BaseScenario
 
 from gym import spaces
 
-class LandMarkObservation:
+class IngressObservation:
 
-    def __init__(self, n_landmarks, agent, world):
-        self.n_landmarks = n_landmarks
-        self.observation_space = spaces.Box(low=-100.0, high=+100.0, shape=(n_landmarks*2 + 2,), dtype=np.float32)
+    def __init__(self, agent, world):
+        n_agents = len(world.agents)
+        self.observation_space = spaces.Box(low=-100.0, 
+                                            high=+100.0, 
+                                            shape=(n_agents*4 + 2,), # pos and vel for agents, pos for target
+                                            dtype=np.float32)
 
     def observation(self, agent, world):
-        obs = np.zeros(shape=(self.n_landmarks*2 + 2,))
-        for i, entity in enumerate(world.landmarks):
-            entity_pos = ((entity.state.p_pos - agent.state.p_pos) / (world.position_scale))
-            obs[i*2] = entity_pos[0]
-            obs[i*2+1] = entity_pos[1]
-        # vel_norm = agent.state.p_vel / np.linalg.norm(agent.state.p_vel)
-        vel_norm = agent.state.p_vel / 350.0
-        obs[-2] = vel_norm[0]
-        obs[-1] = vel_norm[1]
-        
-        return obs
+        # get positions of target in this agent's reference frame
+        tgt_pos = (world.landmarks[0].state.p_pos - agent.state.p_pos) / world.position_scale
+        # get positions and velocities of other agents in this agent's reference frame
+        other_pos = []
+        other_vel = []
+        for other in world.agents:
+            if other is agent: continue
+            other_pos.append((other.state.p_pos - agent.state.p_pos) / world.position_scale)
+            other_vel.append(other.state.p_vel / other.max_speed)
+        return np.concatenate([agent.state.p_pos / world.position_scale] + [agent.state.p_vel / agent.max_speed] + [tgt_pos] + other_pos + other_vel)
 
 class Scenario(BaseScenario):
-    def make_world(self):
+    def make_world(self, done_on_detection=False):
         world = World(is_dynamic=False, position_scale=50000.0)
         world.discrete_action_space = True
         world.dt = 1.0
-        n_landmarks = 1
+        self.done_on_detection = done_on_detection
         # add agents
         world.agents = [Agent() for i in range(2)]
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = False
             agent.silent = True
-            agent.fusioned_sa = LandMarkObservation(n_landmarks, agent, world)
+            agent.fusioned_sa = IngressObservation(agent, world)
             agent.max_speed = 350.0 # 700.0
             agent.min_speed = 0.8 * agent.max_speed
             agent.accel = [1.0*9.81, 8.0]
@@ -50,7 +52,7 @@ class Scenario(BaseScenario):
                 agent.platform_action = RouteAction(route=route)
             else:
                 agent.platform_action = HeadingAction()
-        # add landmarks
+        # add landmark for target
         world.landmarks = [Landmark()]
         world.landmarks[0].name = 'target_landmark'
         world.landmarks[0].collide = False
@@ -90,14 +92,11 @@ class Scenario(BaseScenario):
 
     def reward(self, agent, world):
         rew = 0.0
-        # rew = -0.1
-        # if len(agent.sensor.detections) > 0:
-        #     rew += 10
-        for l in world.landmarks:
-            dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos)))/(world.position_scale) for a in world.agents]
-            # dists = [np.sqrt(np.sum(np.square(a.state.p_pos - l.state.p_pos))) for a in world.agents]
-            rew -= min(dists)
-        # print(rew)
+        if (not agent is world.agents[0]) and self.done(agent, world):
+            distance_to_target = np.linalg.norm(world.landmarks[0].state.p_pos - agent.state.p_pos)
+            start_distance = np.linalg.norm(world.landmarks[0].state.p_pos - np.array([50000.0, 0.0]))
+            rew = (start_distance - distance_to_target) / world.position_scale
+
         return rew
 
     def observation(self, agent, world):
@@ -109,4 +108,9 @@ class Scenario(BaseScenario):
 
     def done(self, agent, world):
         # return (len(agent.sensor.detections)) or (world.steps > 300)
-        return (world.steps > 300)
+        done = (world.steps >= 300)
+        if self.done_on_detection:
+            detected = len(agent.sensor.detections)
+            done = done or detected
+
+        return done
