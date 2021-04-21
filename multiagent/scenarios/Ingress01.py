@@ -26,10 +26,11 @@ class IngressObservation:
         return np.concatenate([agent.state.p_pos / world.position_scale] + [agent.state.p_vel / agent.max_speed] + [tgt_pos] + other_pos + other_vel)
 
 class Scenario(BaseScenario):
-    def make_world(self, done_on_detection=False):
+    def make_world(self, random_starts=False, done_on_detection=False):
         world = World(is_dynamic=False, position_scale=50000.0)
         world.discrete_action_space = True
         world.dt = 1.0
+        self.random_starts = random_starts
         self.done_on_detection = done_on_detection
         # add agents
         world.agents = [Agent() for i in range(2)]
@@ -82,8 +83,13 @@ class Scenario(BaseScenario):
                 agent.state.p_pos = np.array([pos_x, 0.0])
                 agent.state.p_vel = np.array([vel_x, 0.0])
             else:
-                agent.state.p_pos = np.array([50000.0, 0.0])
-                agent.state.p_vel = np.array([-agent.max_speed, 0.0])
+                if self.random_starts:
+                    heading = np.random.random()
+                    agent.state.p_pos = 50000.0 * np.array([np.sin(heading), np.cos(heading)])
+                    agent.state.p_vel = -agent.max_speed * np.array([np.sin(heading), np.cos(heading)])
+                else:
+                    agent.state.p_pos = np.array([50000.0, 0.0])
+                    agent.state.p_vel = np.array([-agent.max_speed, 0.0])
             agent.state.c = np.zeros(world.dim_c)
             agent.state.missiles = agent.state.missiles_loaded
             agent.state.missiles_in_flight = []
