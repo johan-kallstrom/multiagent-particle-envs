@@ -92,11 +92,13 @@ class Viewer(object):
     def add_onetime(self, geom):
         self.onetime_geoms.append(geom)
 
-    def render(self, return_rgb_array=False):
+    def render(self, return_rgb_array=False, VP_W=None, VP_H=None):
         glClearColor(1,1,1,1)
         self.window.clear()
         self.window.switch_to()
         self.window.dispatch_events()
+        if VP_W and VP_H:
+            gl.glViewport(0, 0, VP_W, VP_H)
         self.transform.enable()
         for geom in self.geoms:
             geom.render()
@@ -115,7 +117,6 @@ class Viewer(object):
             # the boundary.) So we use the buffer height/width rather
             # than the requested one.
             arr = arr.reshape(buffer.height, buffer.width, 4)
-            arr = arr[::-1,:,0:3]
         self.window.flip()
         self.onetime_geoms = []
         return arr

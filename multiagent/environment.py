@@ -199,8 +199,8 @@ class MultiAgentEnv(gym.Env):
         self.sensor_render_geoms_xform = None
 
     # render environment
-    def render(self, mode='human'):
-        if mode == 'human':
+    def render(self, mode='human', VP_W=700, VP_H=700, print_text=False):
+        if print_text and mode == 'human':
             alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
             message = ''
             message_constructed = False
@@ -223,7 +223,7 @@ class MultiAgentEnv(gym.Env):
                 # import rendering only if we need it (and don't import for headless machines)
                 #from gym.envs.classic_control import rendering
                 from multiagent import rendering
-                self.viewers[i] = rendering.Viewer(700,700)
+                self.viewers[i] = rendering.Viewer(VP_W, VP_H)
 
         # create rendering geometry
         if self.render_geoms is None:
@@ -287,7 +287,8 @@ class MultiAgentEnv(gym.Env):
                         self.sensor_render_geoms[e].set_color(0.75, 0.25, 0.25, alpha=0.2)
                     else:
                         self.sensor_render_geoms[e].set_color(*entity.color, alpha=0.2)
-                    print("Detecions for entity: ", entity.name, entity.sensor.detections)
+                    if print_text:
+                        print("Detecions for entity: ", entity.name, entity.sensor.detections)
                 # render expendables
                 for missile in entity.state.missiles_in_flight:
                     one_time_geom = self.viewers[i].draw_circle(radius=missile.size, res=30, filled=False)
@@ -297,7 +298,7 @@ class MultiAgentEnv(gym.Env):
                     one_time_geom.set_color(*missile.color)
                     one_time_geom.set_linewidth(5.0)
                 # render to display or array
-            results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
+            results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array', VP_W=VP_W, VP_H=VP_H))
 
         return results
 
