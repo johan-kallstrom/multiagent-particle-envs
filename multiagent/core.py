@@ -5,6 +5,8 @@ from gym import spaces
 class EntityState(object):
     def __init__(self,
                  missiles_loaded=6,
+                 missile_speed=700,
+                 missile_range=30000.0,
                  is_dynamic=True):
         self.is_dynamic = is_dynamic
         # physical position
@@ -15,13 +17,20 @@ class EntityState(object):
         self.observed = False
         # missiles
         self.missiles_loaded = missiles_loaded
+        self.missile_speed = missile_speed
+        self.missile_range = missile_range
         self.missiles = missiles_loaded
         self.missiles_in_flight = []
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
-    def __init__(self):
-        super(AgentState, self).__init__()
+    def __init__(self,
+                 missiles_loaded=6,
+                 missile_speed=700,
+                 missile_range=30000.0):
+        super(AgentState, self).__init__(missiles_loaded=missiles_loaded,
+                                         missile_speed=missile_speed,
+                                         missile_range=missile_range)
         # communication utterance
         self.c = None
 
@@ -384,6 +393,8 @@ class Missile(Entity):
         self.onetime_render = True
         self.size = 0.25 * self.size
         self.destroyed = False
+        self.last_pos = init_pos.copy()
+        self.flight_distance = 0.0
         self.state.p_pos = init_pos
         self.state.p_vel = 2 * init_vel # TODO: COnfigure speed
         self.guidance = PnGuidanceAction(self,
@@ -393,7 +404,11 @@ class Missile(Entity):
     def update_state(self, world):
         self.guidance.update_entity_state(self, world)
         m_to_tgt = self.target.state.p_pos - self.state.p_pos
+        self.flight_distance += np.linalg.norm(self.state.p_pos-self.last_pos)
+        self.last_pos[:] = self.state.p_pos
         if np.linalg.norm(m_to_tgt) < self.lethal_range:
+            self.destroyed = True
+        if self.flight_distance > 30000.0:
             self.destroyed = True
 
 # properties of agent entities
