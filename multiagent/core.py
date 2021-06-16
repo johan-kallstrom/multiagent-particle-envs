@@ -277,11 +277,17 @@ class FireAction(object):
         self.u = action
 
     def update_entity_state(self, entity, world):
+        # possibly fire missile
         if entity.state.missiles > 0 and self.u > 0 and entity.sensor is not None and len(entity.sensor.detections) >= self.u:
-            missile = Missile(entity.sensor.detections[self.u-1], init_pos=entity.state.p_pos.copy(), init_vel=entity.state.p_vel.copy(), world=world) # fire missile
+            missile = Missile(host=entity, 
+                              target=entity.sensor.detections[self.u-1], 
+                              init_pos=entity.state.p_pos.copy(), 
+                              init_vel=entity.state.p_vel.copy(),
+                              world=world)
             entity.state.missiles_in_flight.append(missile)
             entity.state.missiles -= 1
         live_missiles = []
+        # update missile states
         for missile in entity.state.missiles_in_flight:
             missile.update_state(world)
             if not missile.destroyed:
@@ -385,7 +391,7 @@ class Landmark(Entity):
 # properties of missile entities,
 # scenario should define sensor and its properties
 class Missile(Entity):
-    def __init__(self, target, init_pos, init_vel, world):
+    def __init__(self, host, target, init_pos, init_vel, world):
         super(Missile, self).__init__()
         self.target = target
         self.lethal_range = self.size * world.position_scale
