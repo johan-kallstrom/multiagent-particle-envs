@@ -6,7 +6,8 @@ class EntityState(object):
     def __init__(self,
                  missiles_loaded=6,
                  missile_speed=700,
-                 missile_range=30000.0,
+                 missile_acceleration=9*9.82,
+                 missile_range=80000.0,
                  is_dynamic=True):
         self.is_dynamic = is_dynamic
         # physical position
@@ -18,19 +19,15 @@ class EntityState(object):
         # missiles
         self.missiles_loaded = missiles_loaded
         self.missile_speed = missile_speed
+        self.missile_acceleration = missile_acceleration
         self.missile_range = missile_range
         self.missiles = missiles_loaded
         self.missiles_in_flight = []
 
 # state of agents (including communication and internal/mental state)
 class AgentState(EntityState):
-    def __init__(self,
-                 missiles_loaded=6,
-                 missile_speed=700,
-                 missile_range=30000.0):
-        super(AgentState, self).__init__(missiles_loaded=missiles_loaded,
-                                         missile_speed=missile_speed,
-                                         missile_range=missile_range)
+    def __init__(self):
+        super(AgentState, self).__init__()
         # communication utterance
         self.c = None
 
@@ -268,7 +265,7 @@ class PnGuidanceAction(object):
 class FireAction(object):
     def __init__(self, 
                  n_targets): # number of targets in the environment
-        # fire action (fire (u > 0) or not (u = 0))
+        # fire action (fire (u > 0) or not (u = 0); u specifies target)
         self.u = None
         # action space
         self.action_space = spaces.Discrete(n_targets+1)
@@ -281,8 +278,6 @@ class FireAction(object):
         if entity.state.missiles > 0 and self.u > 0 and entity.sensor is not None and len(entity.sensor.detections) >= self.u:
             missile = Missile(host=entity, 
                               target=entity.sensor.detections[self.u-1], 
-                              init_pos=entity.state.p_pos.copy(), 
-                              init_vel=entity.state.p_vel.copy(),
                               world=world)
             entity.state.missiles_in_flight.append(missile)
             entity.state.missiles -= 1
@@ -352,7 +347,8 @@ class Rwr(object):
 
 # properties and state of physical world entity
 class Entity(object):
-    def __init__(self, is_dynamic=True):
+    def __init__(self,
+                 is_dynamic=True):
         # name 
         self.name = ''
         # properties:
@@ -391,21 +387,22 @@ class Landmark(Entity):
 # properties of missile entities,
 # scenario should define sensor and its properties
 class Missile(Entity):
-    def __init__(self, host, target, init_pos, init_vel, world):
+    def __init__(self, host, target, world):
         super(Missile, self).__init__()
+        self.host = host
         self.target = target
+        self.state.p_pos = host.state.p_pos.copy()
+        self.state.p_vel = (host.state.missile_speed/np.linalg.norm(host.state.p_vel)) * host.state.p_vel.copy()
+        self.last_pos = host.state.p_pos.copy()
         self.lethal_range = self.size * world.position_scale
+        self.flight_distance = 0.0
+        self.destroyed = False
         self.color = np.array([0.25,0.25,0.25])
         self.onetime_render = True
-        self.size = 0.25 * self.size
-        self.destroyed = False
-        self.last_pos = init_pos.copy()
-        self.flight_distance = 0.0
-        self.state.p_pos = init_pos
-        self.state.p_vel = 2 * init_vel # TODO: COnfigure speed
+        self.size = 0.25 * self.size        
         self.guidance = PnGuidanceAction(self,
                                          target,
-                                         max_acc=9*9.82)
+                                         max_acc=host.state.missile_acceleration)
 
     def update_state(self, world):
         self.guidance.update_entity_state(self, world)
@@ -414,7 +411,7 @@ class Missile(Entity):
         self.last_pos[:] = self.state.p_pos
         if np.linalg.norm(m_to_tgt) < self.lethal_range:
             self.destroyed = True
-        if self.flight_distance > 30000.0:
+        if self.flight_distance > self.host.state.missile_range:
             self.destroyed = True
 
 # properties of agent entities
