@@ -26,9 +26,9 @@ class MultiAgentEnv(gym.Env):
         self.info_callback = info_callback
         self.done_callback = done_callback
         # environment parameters
-        self.discrete_action_space = world.discrete_action_space if hasattr(world, 'discrete_action_space') else True
+        self.discrete_action_space = True
         # if true, action is a number 0...N, otherwise action is a one-hot N-dimensional vector
-        self.discrete_action_input = world.discrete_action_input if hasattr(world, 'discrete_action_input') else False
+        self.discrete_action_input = False
         # if true, even the action is continuous, action will be performed discretely
         self.force_discrete_action = world.discrete_action if hasattr(world, 'discrete_action') else False
         # if true, every agent has the same reward
@@ -93,6 +93,7 @@ class MultiAgentEnv(gym.Env):
             obs_n.append(self._get_obs(agent))
             reward_n.append(self._get_reward(agent))
             done_n.append(self._get_done(agent))
+
             info_n['n'].append(self._get_info(agent))
 
         # all agents get total reward in cooperative case
@@ -179,7 +180,6 @@ class MultiAgentEnv(gym.Env):
                 sensitivity = agent.accel
             agent.action.u *= sensitivity
             action = action[1:]
-            
         if not agent.silent:
             # communication action
             if self.discrete_action_input:
@@ -195,15 +195,12 @@ class MultiAgentEnv(gym.Env):
     def _reset_render(self):
         self.render_geoms = None
         self.render_geoms_xform = None
-        self.sensor_render_geoms = None
-        self.sensor_render_geoms_xform = None
 
     # render environment
-    def render(self, mode='human', VP_W=700, VP_H=700, print_text=False):
-        if print_text and mode == 'human':
+    def render(self, mode='human'):
+        if mode == 'human':
             alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
             message = ''
-            message_constructed = False
             for agent in self.world.agents:
                 comm = []
                 for other in self.world.agents:
@@ -213,9 +210,7 @@ class MultiAgentEnv(gym.Env):
                     else:
                         word = alphabet[np.argmax(other.state.c)]
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
-                    message_constructed = True
-            if message_constructed:
-                print(message)
+            print(message)
 
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
@@ -223,7 +218,7 @@ class MultiAgentEnv(gym.Env):
                 # import rendering only if we need it (and don't import for headless machines)
                 #from gym.envs.classic_control import rendering
                 from multiagent import rendering
-                self.viewers[i] = rendering.Viewer(VP_W, VP_H)
+                self.viewers[i] = rendering.Viewer(700,700)
 
         # create rendering geometry
         if self.render_geoms is None:
@@ -232,30 +227,20 @@ class MultiAgentEnv(gym.Env):
             from multiagent import rendering
             self.render_geoms = []
             self.render_geoms_xform = []
-            self.sensor_render_geoms = []
-            self.sensor_render_geoms_xform = []
             for entity in self.world.entities:
                 geom = rendering.make_circle(entity.size)
                 xform = rendering.Transform()
-                geom.set_color(*entity.color)
+                if 'agent' in entity.name:
+                    geom.set_color(*entity.color, alpha=0.5)
+                else:
+                    geom.set_color(*entity.color)
                 geom.add_attr(xform)
                 self.render_geoms.append(geom)
                 self.render_geoms_xform.append(xform)
-                if entity.sensor is not None:
-                    v = self._make_receptor_locations(entity, self.world.position_scale)
-                    sensor_geom = rendering.make_polygon(v=v, filled=True)
-                    sensor_geom.set_color(*entity.color, alpha=0.2)
-                    sensor_xform = rendering.Transform()
-                    sensor_geom.add_attr(sensor_xform)
-                    self.sensor_render_geoms.append(sensor_geom)
-                    self.sensor_render_geoms_xform.append(sensor_xform)
 
             # add geoms to viewer
             for viewer in self.viewers:
                 viewer.geoms = []
-                viewer.sensor_geoms = []
-                for sensor_geom in self.sensor_render_geoms:
-                    viewer.add_geom(sensor_geom)
                 for geom in self.render_geoms:
                     viewer.add_geom(geom)
 
@@ -267,53 +252,27 @@ class MultiAgentEnv(gym.Env):
             if self.shared_viewer:
                 pos = np.zeros(self.world.dim_p)
             else:
-                pos = self.agents[i].state.p_pos / self.world.position_scale
+                pos = self.agents[i].state.p_pos
             self.viewers[i].set_bounds(pos[0]-cam_range,pos[0]+cam_range,pos[1]-cam_range,pos[1]+cam_range)
             # update geometry positions
             for e, entity in enumerate(self.world.entities):
-                self.render_geoms_xform[e].set_translation(*(entity.state.p_pos / self.world.position_scale))
-                if (entity.rwr is not None) and (len(entity.rwr.observers) > 0):
-                    one_time_geom = self.viewers[i].draw_circle(radius=entity.size*1.5, res=30, filled=False)
-                    xform = rendering.Transform()
-                    xform.set_translation(*(entity.state.p_pos / self.world.position_scale))
-                    one_time_geom.add_attr(xform)
-                    one_time_geom.set_color(0.75, 0.25, 0.25)
-                    one_time_geom.set_linewidth(5.0)
-                if entity.sensor is not None:
-                    self.sensor_render_geoms_xform[e].set_translation(*(entity.state.p_pos / self.world.position_scale))
-                    rotation = np.sign(entity.state.p_vel[1]) * np.arccos(entity.state.p_vel[0] / np.linalg.norm(entity.state.p_vel))
-                    self.sensor_render_geoms_xform[e].set_rotation(rotation)
-                    if len(entity.sensor.detections) > 0:
-                        self.sensor_render_geoms[e].set_color(0.75, 0.25, 0.25, alpha=0.2)
-                    else:
-                        self.sensor_render_geoms[e].set_color(*entity.color, alpha=0.2)
-                    if print_text:
-                        print("Detecions for entity: ", entity.name, entity.sensor.detections)
-                # render expendables
-                for missile in entity.state.missiles_in_flight:
-                    one_time_geom = self.viewers[i].draw_circle(radius=missile.size, res=30, filled=False)
-                    xform = rendering.Transform()
-                    xform.set_translation(*(missile.state.p_pos / self.world.position_scale))
-                    one_time_geom.add_attr(xform)
-                    one_time_geom.set_color(*missile.color)
-                    one_time_geom.set_linewidth(5.0)
-                # render to display or array
-            results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array', VP_W=VP_W, VP_H=VP_H))
+                self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
+            # render to display or array
+            results.append(self.viewers[i].render(return_rgb_array = mode=='rgb_array'))
 
         return results
 
     # create receptor field locations in local coordinate frame
-    def _make_receptor_locations(self, agent, scale):
-        if agent.sensor is None:
-            return []
+    def _make_receptor_locations(self, agent):
         receptor_type = 'polar'
-        # range_min = 0.05 * 2.0
-        range_max = agent.sensor.max_range / scale
+        range_min = 0.05 * 2.0
+        range_max = 1.00
         dx = []
         # circular receptive field
         if receptor_type == 'polar':
-            for angle in np.linspace(-agent.sensor.fov/2, +agent.sensor.fov/2, 30, endpoint=True):
-                dx.append(range_max * np.array([np.cos(angle), np.sin(angle)]))
+            for angle in np.linspace(-np.pi, +np.pi, 8, endpoint=False):
+                for distance in np.linspace(range_min, range_max, 3):
+                    dx.append(distance * np.array([np.cos(angle), np.sin(angle)]))
             # add origin
             dx.append(np.array([0.0, 0.0]))
         # grid receptive field
@@ -323,43 +282,6 @@ class MultiAgentEnv(gym.Env):
                     dx.append(np.array([x,y]))
         return dx
 
-
-# environment that uses tuple/dict action spaces for all agents in the multiagent world
-# currently code assumes that no agents will be created/destroyed at runtime!
-class ACMultiAgentEnv(MultiAgentEnv):
-    metadata = {
-        'render.modes' : ['human', 'rgb_array']
-    }
-
-    def __init__(self, world, reset_callback=None, reward_callback=None,
-                 observation_callback=None, info_callback=None,
-                 done_callback=None, shared_viewer=True):
-        super(ACMultiAgentEnv, self).__init__(world=world, reset_callback=reset_callback, reward_callback=reward_callback,
-                                              observation_callback=observation_callback, info_callback=info_callback,
-                                              done_callback=done_callback, shared_viewer=shared_viewer)
-        # let each agent define its own observation space
-        self.observation_space = []
-        for agent in self.agents:
-            self.observation_space.append(agent.fusioned_sa.observation_space)
-        # let each scenario define its own action space
-        self.platform_action_space = []
-        self.fire_action_space = []
-        self.action_space = []
-        for agent in self.agents:
-            self.platform_action_space.append(agent.platform_action.action_space)
-            self.fire_action_space.append(agent.fire_action.action_space)
-            self.action_space.append(spaces.Discrete(2))
-
-    # set env action for a particular agent
-    def _set_action(self, action, agent, action_space, time=None):
-        # let each scenario define how to set actions
-        # agent.platform_action.set_action(action["platform_action"])
-        agent.platform_action.set_action(action[0])
-        agent.fire_action.set_action(action[1])
-
-    # get observation for a particular agent
-    def _get_obs(self, agent):
-        return agent.fusioned_sa.observation(agent, self.world)
 
 # vectorized wrapper for a batch of multi-agent environments
 # assumes all environments have the same observation and action space

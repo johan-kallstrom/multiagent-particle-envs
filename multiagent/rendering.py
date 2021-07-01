@@ -11,27 +11,18 @@ if "Apple" in sys.version:
         os.environ['DYLD_FALLBACK_LIBRARY_PATH'] += ':/usr/lib'
         # (JDS 2016/04/15): avoid bug on Anaconda 2.3.0 / Yosemite
 
+from gym.utils import reraise
 from gym import error
 
 try:
     import pyglet
 except ImportError as e:
-    raise ImportError('''
-    Cannot import pyglet.
-    HINT: you can install pyglet directly via 'pip install pyglet'.
-    But if you really just want to install all Gym dependencies and not have to think about it,
-    'pip install -e .[all]' or 'pip install gym[all]' will do it.
-    ''')
+    reraise(suffix="HINT: you can install pyglet directly via 'pip install pyglet'. But if you really just want to install all Gym dependencies and not have to think about it, 'pip install -e .[all]' or 'pip install gym[all]' will do it.")
 
 try:
     from pyglet.gl import *
 except ImportError as e:
-    raise ImportError('''
-    Error occurred while running `from pyglet.gl import *`
-    HINT: make sure you have OpenGL install. On Ubuntu, you can run 'apt-get install python-opengl'.
-    If you're running on a server, you may need a virtual frame buffer; something like this should work:
-    'xvfb-run -s \"-screen 0 1400x900x24\" python <your_script.py>'
-    ''')
+    reraise(prefix="Error occured while running `from pyglet.gl import *`",suffix="HINT: make sure you have OpenGL install. On Ubuntu, you can run 'apt-get install python-opengl'. If you're running on a server, you may need a virtual frame buffer; something like this should work: 'xvfb-run -s \"-screen 0 1400x900x24\" python <your_script.py>'")
 
 import math
 import numpy as np
@@ -92,13 +83,11 @@ class Viewer(object):
     def add_onetime(self, geom):
         self.onetime_geoms.append(geom)
 
-    def render(self, return_rgb_array=False, VP_W=None, VP_H=None):
+    def render(self, return_rgb_array=False):
         glClearColor(1,1,1,1)
         self.window.clear()
         self.window.switch_to()
         self.window.dispatch_events()
-        if VP_W and VP_H:
-            gl.glViewport(0, 0, VP_W, VP_H)
         self.transform.enable()
         for geom in self.geoms:
             geom.render()
@@ -117,6 +106,7 @@ class Viewer(object):
             # the boundary.) So we use the buffer height/width rather
             # than the requested one.
             arr = arr.reshape(buffer.height, buffer.width, 4)
+            arr = arr[::-1,:,0:3]
         self.window.flip()
         self.onetime_geoms = []
         return arr
